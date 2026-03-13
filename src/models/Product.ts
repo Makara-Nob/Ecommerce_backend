@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { autoIncrementPlugin } from '../utils/autoIncrement';
 
-export interface ICategory extends Document<string> {
+export interface ICategory extends Document<number> {
     id: number;
     name: string;
     description?: string;
@@ -16,7 +16,7 @@ const categorySchema = new Schema<ICategory>({
 }, { timestamps: true });
 categorySchema.plugin(autoIncrementPlugin, { modelName: 'Category', field: '_id' });
 
-export interface ISupplier extends Document<string> {
+export interface ISupplier extends Document<number> {
     id: number;
     name: string;
     contactPerson?: string;
@@ -37,7 +37,7 @@ const supplierSchema = new Schema<ISupplier>({
 }, { timestamps: true });
 supplierSchema.plugin(autoIncrementPlugin, { modelName: 'Supplier', field: '_id' });
 
-export interface IBrand extends Document<string> {
+export interface IBrand extends Document<number> {
     id: number;
     name: string;
     description?: string;
@@ -54,7 +54,7 @@ const brandSchema = new Schema<IBrand>({
 }, { timestamps: true });
 brandSchema.plugin(autoIncrementPlugin, { modelName: 'Brand', field: '_id' });
 
-export interface IProductVariant extends Document<string> {
+export interface IProductVariant extends Document<number> {
     id: number;
     variantName?: string;
     sku?: string;
@@ -79,7 +79,7 @@ const productVariantSchema = new Schema<IProductVariant>({
 }, { timestamps: true });
 productVariantSchema.plugin(autoIncrementPlugin, { modelName: 'ProductVariant', field: '_id' });
 
-export interface IProduct extends Document<string> {
+export interface IProduct extends Document<number> {
     id: number;
     name: string;
     sku: string;

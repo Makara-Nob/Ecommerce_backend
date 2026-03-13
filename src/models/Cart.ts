@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { autoIncrementPlugin } from '../utils/autoIncrement';
 
-export interface ICartItem extends Document<string> {
+export interface ICartItem extends Document<number> {
     id: number;
     cartId: number;
     product: number;
@@ -21,7 +21,7 @@ const cartItemSchema = new Schema<ICartItem>({
 
 cartItemSchema.plugin(autoIncrementPlugin, { modelName: 'CartItem', field: '_id' });
 
-export interface ICart extends Document<string> {
+export interface ICart extends Document<number> {
     id: number;
     userId: number;
     status: 'ACTIVE' | 'CHECKED_OUT' | 'ABANDONED';

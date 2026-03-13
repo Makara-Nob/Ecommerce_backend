@@ -1,101 +1,165 @@
-import crypto from 'crypto';
+import crypto from "crypto";
 
-export const ABA_PAYWAY_API_URL = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase';
-const ABA_PAYWAY_MERCHANT_ID = process.env.ABA_PAYWAY_MERCHANT_ID || '';
-const ABA_PAYWAY_API_KEY = process.env.ABA_PAYWAY_API_KEY || '';
+// Sandbox / API URL
+export const ABA_PAYWAY_API_URL =
+  process.env.ABA_PAYWAY_API_URL ||
+  "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase";
+
+// Merchant ID
+const ABA_PAYWAY_MERCHANT_ID = process.env.ABA_PAYWAY_MERCHANT_ID || "";
+
+// Use the API Key for HMAC hash generation
+const ABA_PAYWAY_API_KEY = process.env.ABA_PAYWAY_API_KEY || "";
+
+// Private key variable (for signing if needed)
+const ABA_PAYWAY_PRIVATE_KEY = process.env.ABA_RSA_PRIVATE_KEY || "";
 
 /**
  * Generate HMAC-SHA512 hash for ABA PayWay checkout payload
  */
 export const generatePwHash = (payload: any): string => {
-    // According to ABA documentation, the hash string is exactly the concatenation of
-    // the following fields in this specific order. Empty string if a field is omitted.
-    const hashString = (payload.req_time || '') +
-                       (payload.merchant_id || '') +
-                       (payload.tran_id || '') +
-                       (payload.amount || '') +
-                       (payload.items || '') +
-                       (payload.shipping || '') +
-                       (payload.firstname || '') +
-                       (payload.lastname || '') +
-                       (payload.email || '') +
-                       (payload.phone || '') +
-                       (payload.type || '') +
-                       (payload.payment_option || '') +
-                       (payload.return_url || '') +
-                       (payload.cancel_url || '') +
-                       (payload.continue_success_url || '') +
-                       (payload.return_deeplink || '') +
-                       (payload.custom_fields || '') +
-                       (payload.return_params || '');
+  const hashString =
+    (payload.req_time || "") +
+    (payload.merchant_id || "") +
+    (payload.tran_id || "") +
+    (payload.amount || "") +
+    (payload.items || "") +
+    (payload.shipping || "") +
+    (payload.firstname || "") +
+    (payload.lastname || "") +
+    (payload.email || "") +
+    (payload.phone || "") +
+    (payload.type || "") +
+    (payload.payment_option || "") +
+    (payload.return_url || "") +
+    (payload.cancel_url || "") +
+    (payload.continue_success_url || "") +
+    (payload.return_deeplink || "") +
+    (payload.currency || "") +
+    (payload.custom_fields || "") +
+    (payload.return_params || "") +
+    (payload.payout || "") +
+    (payload.lifetime || "") +
+    (payload.additional_params || "") +
+    (payload.google_pay_token || "") +
+    (payload.skip_success_page || "");
 
-    return crypto.createHmac('sha512', ABA_PAYWAY_API_KEY).update(hashString).digest('base64');
+  // Use API Key as the “key” for HMAC-SHA512
+  return crypto
+    .createHmac("sha512", ABA_PAYWAY_API_KEY)
+    .update(hashString)
+    .digest("base64");
 };
 
 /**
  * Get the full payload to render the checkout form
  */
 export const getCheckoutPayload = (orderInfo: any) => {
-    const req_time = Math.floor(Date.now() / 1000).toString(); // Wait, usually req_time is format YYYYMMDDHHmmss or Unix timestamp? Wait, ABA Payway standard req_time format is YYYYMMDDHHMMSS or just a unique string. Actually, let's use a standard format just in case, or Unix timestamp is fine. ABA docs specify req_time as a Unix timestamp or YYYYMMDDHHmmss... wait, usually Unix timestamp string or simple unique id. Let's use Date.now().
-    
-    // YYYYMMDDHHMMSS format is often safer for ABA
-    const dt = new Date();
-    const req_time_formatted = dt.getFullYear().toString() + 
-        (dt.getMonth() + 1).toString().padStart(2, '0') + 
-        dt.getDate().toString().padStart(2, '0') + 
-        dt.getHours().toString().padStart(2, '0') + 
-        dt.getMinutes().toString().padStart(2, '0') + 
-        dt.getSeconds().toString().padStart(2, '0');
+  const dt = new Date();
+  const req_time =
+    dt.getFullYear().toString() +
+    (dt.getMonth() + 1).toString().padStart(2, "0") +
+    dt.getDate().toString().padStart(2, "0") +
+    dt.getHours().toString().padStart(2, "0") +
+    dt.getMinutes().toString().padStart(2, "0") +
+    dt.getSeconds().toString().padStart(2, "0");
 
-    // Base64 encode the items array
-    const items = Buffer.from(JSON.stringify(orderInfo.items)).toString('base64');
+  const items = Buffer.from(JSON.stringify(orderInfo.items)).toString("base64");
 
-    const payload = {
-        req_time: req_time_formatted,
-        merchant_id: ABA_PAYWAY_MERCHANT_ID,
-        tran_id: orderInfo.tran_id,
-        amount: parseFloat(orderInfo.amount).toFixed(2),
-        items: items,
-        firstname: orderInfo.firstname || '',
-        lastname: orderInfo.lastname || '',
-        email: orderInfo.email || '',
-        phone: orderInfo.phone || '',
-        type: 'purchase',
-        payment_option: '', // empty for all options or 'cards' / 'abapay'
-        return_url: '', // Add your frontend return URLs if needed
-        continue_success_url: '', 
-        cancel_url: ''
-    };
+  const payload = {
+    req_time,
+    merchant_id: ABA_PAYWAY_MERCHANT_ID,
+    tran_id: orderInfo.tran_id,
+    amount: parseFloat(orderInfo.amount).toFixed(2),
+    items,
+    shipping: "0.00",
+    currency: orderInfo.currency || "USD",
+    firstname: orderInfo.firstname || "",
+    lastname: orderInfo.lastname || "",
+    email: orderInfo.email || "",
+    phone: orderInfo.phone || "",
+    type: "purchase",
+    payment_option: orderInfo.payment_option || "",
+    return_url: process.env.ABA_RETURN_URL || "",
+    continue_success_url: process.env.ABA_SUCCESS_URL || "",
+    cancel_url: process.env.ABA_CANCEL_URL || "",
+    return_deeplink: orderInfo.return_deeplink || "",
+    custom_fields: orderInfo.custom_fields || "",
+    return_params: orderInfo.return_params || "",
+    payout: orderInfo.payout || "",
+    lifetime: orderInfo.lifetime || "",
+    additional_params: orderInfo.additional_params || "",
+    google_pay_token: orderInfo.google_pay_token || "",
+    skip_success_page: orderInfo.skip_success_page || "",
+  };
 
-    const hash = generatePwHash(payload);
+  const hash = generatePwHash(payload);
 
-    return {
-        ...payload,
-        hash
-    };
+  return {
+    ...payload,
+    hash,
+  };
 };
 
 /**
- * Verify webhook hash from ABA S2S callback
+ * Verify webhook hash from ABA S2S callback (sandbox)
  */
-export const verifyWebhookHash = (tran_id: string, apv: string, status: string, hash: string): boolean => {
-    // Typically ABA webhook callback hash is the Base64 HMAC-SHA512 of (tran_id + status)
-    // Actually, sometimes it's tran_id + amount + status + API_KEY. 
-    // Wait, the standard S2S webhook hash logic from ABA: 
-    // hash = hmac_sha512(tran_id, ABA_PAYWAY_API_KEY)
-    // Wait, let's implement the standard one: 
-    // They pass `hash`. Usually we reconstruct the string based on what they sent.
-    
-    // We will verify the status by regenerating the hash they sent
-    // Based on common ABA implementations:
-    // `hash` from webhook = HMAC-SHA512(tran_id + apv + status) ... wait, ABA webhook is usually POST form data
-    
-    // Let's implement a fallback. We return true to allow processing but log warnings if missing explicit docs, 
-    // or we check if our generated hash matches.
-    // ABA S2S hash = base64 HMAC-SHA512 of `tran_id` + `apv` + `status`
-    
-    // Edit: Actually the standard push notification hash from ABA PayWay is calculated string: `tran_id`
-    // And actually `hashString = tran_id` ? 
-    // The most reliable is to just do `hashString = tran_id`.
-    return true; // we will trust it for simulation/sandbox, in production will implement strict signature check based on exact ABA payload.
+export const verifyWebhookHash = (
+  tran_id: string,
+  status: string,
+  hash: string,
+) => {
+  const raw = tran_id + status;
+
+  const expectedHash = crypto
+    .createHmac("sha512", ABA_PAYWAY_API_KEY)
+    .update(raw)
+    .digest("base64");
+
+  return expectedHash === hash;
 };
+
+/**
+ * Check transaction status using ABA Payway check-transaction-2 API
+ */
+export const checkAbaTransaction = async (tran_id: string) => {
+  const dt = new Date();
+  const req_time =
+    dt.getFullYear().toString() +
+    (dt.getMonth() + 1).toString().padStart(2, "0") +
+    dt.getDate().toString().padStart(2, "0") +
+    dt.getHours().toString().padStart(2, "0") +
+    dt.getMinutes().toString().padStart(2, "0") +
+    dt.getSeconds().toString().padStart(2, "0");
+
+  const hashString = req_time + ABA_PAYWAY_MERCHANT_ID + tran_id;
+  const hash = crypto
+    .createHmac("sha512", ABA_PAYWAY_API_KEY)
+    .update(hashString)
+    .digest("base64");
+
+  const checkUrl = "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/check-transaction-2";
+
+  const formData = new URLSearchParams();
+  formData.append("req_time", req_time);
+  formData.append("merchant_id", ABA_PAYWAY_MERCHANT_ID);
+  formData.append("tran_id", tran_id);
+  formData.append("hash", hash);
+
+  const response = await fetch(checkUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: formData.toString()
+  });
+
+  if (!response.ok) {
+    throw new Error(`ABA API returned ${response.status}`);
+  }
+
+  return await response.json();
+};
+
+// Export private key for any signing operations if needed
+export { ABA_PAYWAY_PRIVATE_KEY };

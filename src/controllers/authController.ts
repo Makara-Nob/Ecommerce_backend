@@ -128,6 +128,65 @@ export default function(appRouter: Router) {
 
   /**
    * @swagger
+   * /api/v1/auth/token/update-profile:
+   *   post:
+   *     summary: Update profile
+   *     tags: [Auth]
+   *     security:
+   *       - bearerAuth: []
+   *     description: Update current logged in user profile
+   *     responses:
+   *       200:
+   *         description: Profile updated
+   *       401:
+   *         description: Not authorized API token
+   */
+  // @desc    Update user profile
+  // @route   POST /api/v1/auth/token/update-profile
+  // @access  Private
+  appRouter.post("/api/v1/auth/token/update-profile", async (req: IncomingMessage, res: ServerResponse) => {
+    try {
+      const userId = await protect(req, res, appRouter);
+      if (!userId) {
+        return;
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return appRouter.sendResponse(res, 404, { message: "User not found" });
+      }
+
+      const body = await appRouter.parseJsonBody(req);
+      if (body.fullName) user.fullName = body.fullName;
+      if (body.email) user.email = body.email;
+      if (body.phone) user.phone = body.phone;
+      if (body.profileUrl) user.profileUrl = body.profileUrl;
+
+      await user.save();
+
+      appRouter.sendResponse(res, 200, {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        fullName: user.fullName,
+        role: user.roles && user.roles.length > 0 ? user.roles[0] : 'CUSTOMER',
+        active: user.status === 'ACTIVE',
+        position: user.position,
+        status: user.status,
+        userPermission: user.userPermission,
+        roles: user.roles,
+        profileUrl: user.profileUrl,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      });
+    } catch (e) {
+      appRouter.sendResponse(res, 500, { message: "Server Error" });
+    }
+  });
+
+  /**
+   * @swagger
    * /api/v1/auth/validate-token:
    *   get:
    *     summary: Validate token
