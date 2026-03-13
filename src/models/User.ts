@@ -10,8 +10,10 @@ export interface IUser extends Document<string>, IUserMethods {
     id: number;
     username: string;
     email: string;
+    phone?: string;
     password?: string;
     fullName: string;
+    profileUrl?: string;
     position?: string;
     status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
     userPermission: 'APPROVED' | 'PENDING' | 'REJECTED' | 'NORMAL';
@@ -39,6 +41,10 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods>({
             'Please add a valid email'
         ]
     },
+    phone: {
+        type: String,
+        default: null
+    },
     password: {
         type: String,
         required: true,
@@ -46,6 +52,10 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods>({
     fullName: {
         type: String,
         required: true,
+    },
+    profileUrl: {
+        type: String,
+        default: null
     },
     position: {
         type: String,
