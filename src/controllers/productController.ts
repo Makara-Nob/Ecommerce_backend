@@ -45,7 +45,7 @@ appRouter.post('/api/v1/public/products/all', async (req: IncomingMessage, res: 
         
         const products = await Product.find(filter)
             .populate('category', 'id name description')
-            .populate('brand', 'id name description')
+            .populate('brand', 'id name description logoUrl')
             .populate('supplier', 'id name contactPerson phone email')
             .skip(skip)
             .limit(limit);
@@ -165,7 +165,7 @@ appRouter.get('/api/v1/public/products/:id/related', async (req: IncomingMessage
          })
          .limit(4)
          .populate('category', 'id name description')
-         .populate('brand', 'id name description')
+         .populate('brand', 'id name description logoUrl')
          .populate('supplier', 'id name contactPerson phone email');
 
          const mappedRelated = related.map((p: any) => {
