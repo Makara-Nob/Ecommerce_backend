@@ -94,6 +94,7 @@ export interface IProduct extends Document<number> {
     status: string;
     viewCount: number;
     imageUrl?: string;
+    images: string[];
     variants: IProductVariant[];
 }
 
@@ -112,6 +113,7 @@ const productSchema = new Schema<IProduct>({
     status: { type: String, default: 'ACTIVE' },
     viewCount: { type: Number, default: 0 },
     imageUrl: String,
+    images: { type: [String], default: [] },
     variants: [productVariantSchema]
 }, { timestamps: true });
 productSchema.plugin(autoIncrementPlugin, { modelName: 'Product', field: '_id' });

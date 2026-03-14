@@ -76,6 +76,100 @@ appRouter.post('/api/v1/public/products/all', async (req: IncomingMessage, res: 
     }
 });
 
+// @desc    Get popular products (sorted by viewCount)
+// @route   GET /api/v1/public/products/popular
+// @access  Public
+appRouter.get('/api/v1/public/products/popular', async (req: IncomingMessage & { query?: any }, res: ServerResponse) => {
+    try {
+        const url = new URL(req.url || '', 'http://localhost');
+        const page = parseInt(url.searchParams.get('page') || '1');
+        const limit = parseInt(url.searchParams.get('limit') || '10');
+        const skip = (page - 1) * limit;
+
+        const filter: any = { status: 'ACTIVE' };
+        const totalElements = await Product.countDocuments(filter);
+        const totalPages = Math.ceil(totalElements / limit);
+
+        const products = await Product.find(filter)
+            .sort({ viewCount: -1 })
+            .populate('category', 'id name description')
+            .populate('brand', 'id name description logoUrl')
+            .populate('supplier', 'id name contactPerson phone email')
+            .skip(skip)
+            .limit(limit);
+
+        const mappedProducts = products.map((p: any) => {
+            const pObj = p.toObject();
+            return {
+                ...pObj,
+                id: pObj._id,
+                category: pObj.category ? { ...pObj.category, id: pObj.category._id } : null,
+                brand: pObj.brand ? { ...pObj.brand, id: pObj.brand._id } : null,
+                supplier: pObj.supplier ? { ...pObj.supplier, id: pObj.supplier._id } : null,
+                variants: pObj.variants ? pObj.variants.map((v: any) => ({ ...v, id: v._id })) : []
+            };
+        });
+
+        appRouter.sendResponse(res, 200, {
+            content: mappedProducts,
+            totalElements,
+            totalPages,
+            pageNo: page,
+            pageSize: limit,
+            last: page >= totalPages
+        });
+    } catch (e) {
+        appRouter.sendResponse(res, 500, { message: 'Server Error' });
+    }
+});
+
+// @desc    Get latest products (sorted by createdAt desc)
+// @route   GET /api/v1/public/products/latest
+// @access  Public
+appRouter.get('/api/v1/public/products/latest', async (req: IncomingMessage & { query?: any }, res: ServerResponse) => {
+    try {
+        const url = new URL(req.url || '', 'http://localhost');
+        const page = parseInt(url.searchParams.get('page') || '1');
+        const limit = parseInt(url.searchParams.get('limit') || '10');
+        const skip = (page - 1) * limit;
+
+        const filter: any = { status: 'ACTIVE' };
+        const totalElements = await Product.countDocuments(filter);
+        const totalPages = Math.ceil(totalElements / limit);
+
+        const products = await Product.find(filter)
+            .sort({ createdAt: -1 })
+            .populate('category', 'id name description')
+            .populate('brand', 'id name description logoUrl')
+            .populate('supplier', 'id name contactPerson phone email')
+            .skip(skip)
+            .limit(limit);
+
+        const mappedProducts = products.map((p: any) => {
+            const pObj = p.toObject();
+            return {
+                ...pObj,
+                id: pObj._id,
+                category: pObj.category ? { ...pObj.category, id: pObj.category._id } : null,
+                brand: pObj.brand ? { ...pObj.brand, id: pObj.brand._id } : null,
+                supplier: pObj.supplier ? { ...pObj.supplier, id: pObj.supplier._id } : null,
+                variants: pObj.variants ? pObj.variants.map((v: any) => ({ ...v, id: v._id })) : []
+            };
+        });
+
+        appRouter.sendResponse(res, 200, {
+            content: mappedProducts,
+            totalElements,
+            totalPages,
+            pageNo: page,
+            pageSize: limit,
+            last: page >= totalPages
+        });
+    } catch (e) {
+        appRouter.sendResponse(res, 500, { message: 'Server Error' });
+    }
+});
+
 /**
  * @swagger
  * /api/v1/public/products/{id}:
