@@ -6,13 +6,15 @@ export interface ICategory extends Document<number> {
     name: string;
     description?: string;
     code?: string;
+    icon?: string;
 }
 
 const categorySchema = new Schema<ICategory>({
     _id: Number,
     name: { type: String, required: true },
     description: String,
-    code: { type: String, unique: true }
+    code: { type: String, unique: true },
+    icon: { type: String }
 }, { timestamps: true });
 categorySchema.plugin(autoIncrementPlugin, { modelName: 'Category', field: '_id' });
 
