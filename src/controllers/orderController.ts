@@ -6,7 +6,7 @@ import { Router } from "../utils/Router";
 import { IncomingMessage, ServerResponse } from "http";
 import {
   getCheckoutPayload,
-  verifyWebhookHash,
+  verifyWebhookSignature,
   checkAbaTransaction,
   ABA_PAYWAY_API_URL,
 } from "../utils/abaPayway";
@@ -329,21 +329,24 @@ export default function (appRouter: Router) {
         // Call ABA Check Transaction API
         const abaResponse = await checkAbaTransaction(order.paywayTranId);
 
-        // Update local DB if status from ABA means completed or cancelled
-        // Status "0" = Success
-        if (abaResponse.status === 0 && order.status === "PENDING") {
+        // abaResponse.status.code "00" = API Success
+        // abaResponse.data.payment_status_code 0 = Payment Success
+        const isAbaSuccess =
+          abaResponse.status &&
+          abaResponse.status.code === "00" &&
+          abaResponse.data &&
+          abaResponse.data.payment_status_code === 0;
+
+        if (isAbaSuccess && order.status === "PENDING") {
           order.status = "CONFIRMED";
           order.paywayStatus = "APPROVED";
           await order.save();
-        } else if (abaResponse.status !== 0 && abaResponse.status !== 1 && order.status === "PENDING") {
-           // Depending on ABA status codes, you might cancel it here if explicitly failed.
-           // Usually 1 is pending/created, 0 is success. 
         }
 
-        appRouter.sendResponse(res, 200, { 
-          message: "Check completed", 
-          abaResponse, 
-          order 
+        appRouter.sendResponse(res, 200, {
+          message: "Check completed",
+          abaResponse,
+          order
         });
 
       } catch (e: any) {
@@ -367,82 +370,68 @@ export default function (appRouter: Router) {
    *       200:
    *         description: Webhook processed
    */
-  appRouter.post(
-    "/api/v1/orders/payway-webhook",
-    async (req: IncomingMessage, res: ServerResponse) => {
-      try {
-        // ABA usually sends data in form-data or JSON, depending on config.
-        // Assuming JSON body for the structure, or wait, ABA Payway sends form application/x-www-form-urlencoded
-        const bodyContent = await appRouter.parseJsonBody(req);
+    appRouter.post(
+      "/api/v1/orders/payway-webhook",
+      async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const payload = await appRouter.parseJsonBody(req);
+          const signature = req.headers["x-payway-hmac-sha512"] as string;
 
-        let payload: any = {};
-        if (typeof bodyContent === "string") {
-          // Parse url-encoded string
-          const parsed = new URLSearchParams(bodyContent);
-          parsed.forEach((value, key) => {
-            payload[key] = value;
-          });
-        } else {
-          payload = bodyContent;
-        }
-
-        const tran_id = payload.tran_id;
-        const apv = payload.apv || ""; // approval code
-        const status = payload.status; // 0 for success
-        const hash = payload.hash;
-
-        console.log(
-          `[ABA Webhook] Received status ${status} for tran_id ${tran_id}`,
-        );
-
-        if (tran_id) {
-          const isValid = verifyWebhookHash(tran_id, status, hash); // <- fixed
-
-          if (!isValid) {
-            return appRouter.sendResponse(res, 400, {
-              message: "Invalid hash signature",
+          if (!signature || !verifyWebhookSignature(payload, signature)) {
+            console.error("[ABA Webhook] Invalid signature or missing header");
+            return appRouter.sendResponse(res, 401, {
+              message: "Invalid signature",
             });
           }
 
-          const order = await Order.findOne({ paywayTranId: tran_id });
-          if (order) {
-            if (status === "0") {
-              order.status = "CONFIRMED";
-              order.paywayStatus = "APPROVED";
-            } else {
-              order.status = "CANCELLED";
-              order.paywayStatus = `DECLINED_${status}`;
+          const tran_id = payload.tran_id;
+          const status = payload.status; // 0 for success
 
-              // Restock items
-              for (const item of order.items) {
-                const product = await Product.findById(item.product);
-                if (product) {
-                  product.quantity += item.quantity;
-                  await product.save();
+          console.log(
+            `[ABA Webhook] Received status ${status} for tran_id ${tran_id}`,
+          );
+
+          if (tran_id) {
+            const order = await Order.findOne({ paywayTranId: tran_id });
+            if (order) {
+              if (status === "0" && order.status === "PENDING") {
+                order.status = "CONFIRMED";
+                order.paywayStatus = "APPROVED";
+                await order.save();
+              } else if (status !== "0" && order.status === "PENDING") {
+                order.status = "CANCELLED";
+                order.paywayStatus = `DECLINED_${status}`;
+
+                // Restock items
+                for (const item of order.items) {
+                  const product = await Product.findById(item.product);
+                  if (product) {
+                    product.quantity += item.quantity;
+                    await product.save();
+                  }
                 }
+                await order.save();
               }
+            } else {
+              console.error(
+                `[ABA Webhook] Order with tran_id ${tran_id} not found`,
+              );
             }
-            await order.save();
-          } else {
-            console.error(
-              `[ABA Webhook] Order with tran_id ${tran_id} not found`,
-            );
           }
-        }
 
-        // Must respond HTTP 200 to acknowledge receipt to ABA
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "success" }));
-      } catch (e: any) {
-        console.error("[ABA Webhook] Error:", e);
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(
-          JSON.stringify({
-            status: "error",
-            message: e.message || "Server Error",
-          }),
-        );
-      }
-    },
-  );
+          // Must respond HTTP 200 to acknowledge receipt to ABA
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ status: "success" }));
+        } catch (e: any) {
+          console.error("[ABA Webhook] Error:", e);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              status: "error",
+              message: e.message || "Server Error",
+            }),
+          );
+        }
+      },
+    );
 }
