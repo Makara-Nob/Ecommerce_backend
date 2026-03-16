@@ -261,7 +261,7 @@ export default function (appRouter: Router) {
         const userId = await protect(req, res, appRouter);
         if (!userId) return;
 
-        const order = await Order.findOne({ id: req.params.id }).populate({
+        const order = await Order.findById(req.params.id).populate({
           path: "items.product",
           model: "Product",
           select: "id name sku imageUrl price sellingPrice",
@@ -314,7 +314,7 @@ export default function (appRouter: Router) {
         const userId = await protect(req, res, appRouter);
         if (!userId) return;
 
-        const order = await Order.findOne({ id: req.params.id });
+        const order = await Order.findById(req.params.id);
 
         if (!order) {
           return appRouter.sendResponse(res, 404, { message: "Order not found" });
