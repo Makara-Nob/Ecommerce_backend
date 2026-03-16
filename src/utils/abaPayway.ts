@@ -102,21 +102,34 @@ export const getCheckoutPayload = (orderInfo: any) => {
 };
 
 /**
- * Verify webhook hash from ABA S2S callback (sandbox)
+ * Verify webhook signature from ABA PayWay Checkout 2.0
  */
-export const verifyWebhookHash = (
-  tran_id: string,
-  status: string,
-  hash: string,
+export const verifyWebhookSignature = (
+  payload: any,
+  receivedSignature: string,
 ) => {
-  const raw = tran_id + status;
+  // 1. Sort fields by key (ascending)
+  const keys = Object.keys(payload).sort();
 
-  const expectedHash = crypto
+  // 2. Concatenate all values
+  let b4hash = "";
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "object" && value !== null) {
+      b4hash += JSON.stringify(value);
+    } else {
+      b4hash += value;
+    }
+  }
+
+  // 3. Generate HMAC-SHA512 signature
+  const expectedSignature = crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
-    .update(raw)
+    .update(b4hash)
     .digest("base64");
 
-  return expectedHash === hash;
+  // 4. Compare signatures
+  return expectedSignature === receivedSignature;
 };
 
 /**
