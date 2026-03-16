@@ -41,7 +41,10 @@ reportController(appRouter);
 
 // Swagger definition
 appRouter.get('/api-docs.json', async (req, res) => {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+    });
     res.end(JSON.stringify(swaggerSpec));
 });
 
@@ -75,7 +78,10 @@ appRouter.get('/api-docs', async (req, res) => {
     </body>
     </html>`;
 
-    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.writeHead(200, { 
+        'Content-Type': 'text/html',
+        'Access-Control-Allow-Origin': '*'
+    });
     res.end(html);
 });
 

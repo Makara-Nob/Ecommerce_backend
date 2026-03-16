@@ -109,7 +109,9 @@ export class Router {
     sendResponse(res: http.ServerResponse, statusCode: number, data: any) {
         res.writeHead(statusCode, {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*' // Add basic CORS to responses
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
         });
 
         const isSuccess = statusCode >= 200 && statusCode < 300;
