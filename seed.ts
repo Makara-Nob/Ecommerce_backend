@@ -18,7 +18,7 @@ const IMAGES = {
     "https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&q=80&w=800", // Smartwatch
     "https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?auto=format&fit=crop&q=80&w=800", // Laptop Dell
     "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?auto=format&fit=crop&q=80&w=800", // Keyboard
-    "https://images.unsplash.com/photo-1612830197210-e8f1046f1672?auto=format&fit=crop&q=80&w=800", // AirPods
+    "https://picsum.photos/seed/airpods/800/800", // AirPods
     "https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?auto=format&fit=crop&q=80&w=800", // Camera
     "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&q=80&w=800", // Polaroid
     "https://images.unsplash.com/photo-1547394765-185e1e68f34e?auto=format&fit=crop&q=80&w=800", // Speaker
@@ -81,13 +81,13 @@ const IMAGES = {
     "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?auto=format&fit=crop&q=80&w=800", // Coffee beans
     "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=800", // Chocolate
     "https://images.unsplash.com/photo-1505253758473-96b7015fcd40?auto=format&fit=crop&q=80&w=800", // Nuts
-    "https://images.unsplash.com/photo-1559181567-c3190bdc8dfe?auto=format&fit=crop&q=80&w=800", // Honey
+    "https://picsum.photos/seed/honey/800/800", // Honey
     "https://images.unsplash.com/photo-1526081347589-7fa4b4916e43?auto=format&fit=crop&q=80&w=800", // Olive oil
     "https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&q=80&w=800", // Tea
   ],
   TOYS: [
-    "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?auto=format&fit=crop&q=80&w=800", // Lego
-    "https://images.unsplash.com/photo-1604158312298-2b3a695f70b3?auto=format&fit=crop&q=80&w=800", // Board game
+    "https://picsum.photos/seed/lego/800/800", // Lego
+    "https://picsum.photos/seed/boardgame/800/800", // Board game
     "https://images.unsplash.com/photo-1535378917042-10a22c95931a?auto=format&fit=crop&q=80&w=800", // RC car
     "https://images.unsplash.com/photo-1545558014-8692077e9b5c?auto=format&fit=crop&q=80&w=800", // Teddy bear
     "https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&q=80&w=800", // Drone
