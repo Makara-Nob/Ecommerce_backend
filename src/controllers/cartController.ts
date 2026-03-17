@@ -265,7 +265,21 @@ export default function (appRouter: Router) {
         await cartItem.save();
 
         await calculateTotal(cart);
-        appRouter.sendResponse(res, 200, cartItem);
+
+        // Populate and return updated cart so Flutter can parse it
+        const updatedCart = (await Cart.findById(cart._id).populate({
+          path: "items",
+          populate: {
+            path: "product",
+            populate: [
+              { path: "category" },
+              { path: "brand" },
+              { path: "supplier" },
+            ],
+          },
+        })) as any;
+
+        appRouter.sendResponse(res, 200, updatedCart);
       } catch (e) {
         appRouter.sendResponse(res, 500, { message: "Server Error" });
       }
@@ -330,9 +344,65 @@ export default function (appRouter: Router) {
 
         // Delete item
         await CartItem.findByIdAndDelete(cartItem._id);
-        await calculateTotal(cart);
+        const updatedCartPlain = await calculateTotal(cart);
 
-        appRouter.sendResponse(res, 200, { message: "Item removed from cart" });
+        // Populate and return updated cart so Flutter can parse it
+        const updatedCart = (await Cart.findById(cart._id).populate({
+          path: "items",
+          populate: {
+            path: "product",
+            populate: [
+              { path: "category" },
+              { path: "brand" },
+              { path: "supplier" },
+            ],
+          },
+        })) as any;
+
+        appRouter.sendResponse(res, 200, updatedCart);
+      } catch (e) {
+        appRouter.sendResponse(res, 500, { message: "Server Error" });
+      }
+    },
+  );
+
+  // @desc    Clear active cart
+  // @route   DELETE /api/v1/cart
+  // @access  Private
+  /**
+   * @swagger
+   * /api/v1/cart:
+   *   delete:
+   *     summary: Clear cart
+   *     tags: [Cart]
+   *     security:
+   *       - bearerAuth: []
+   *     description: Remove all items from the active cart
+   *     responses:
+   *       200:
+   *         description: Cart cleared successfully
+   *       401:
+   *         description: Not authorized
+   */
+  appRouter.delete(
+    "/api/v1/cart",
+    async (req: IncomingMessage, res: ServerResponse) => {
+      try {
+        const userId = await protect(req, res, appRouter);
+        if (!userId) return;
+
+        const cart = await Cart.findOne({ userId, status: "ACTIVE" });
+        if (!cart) {
+          return appRouter.sendResponse(res, 200, { message: "Cart is already empty" });
+        }
+
+        // Delete all items and reset cart
+        await CartItem.deleteMany({ cartId: cart._id });
+        cart.items = [];
+        cart.totalAmount = 0;
+        await cart.save();
+
+        appRouter.sendResponse(res, 200, { message: "Cart cleared" });
       } catch (e) {
         appRouter.sendResponse(res, 500, { message: "Server Error" });
       }
