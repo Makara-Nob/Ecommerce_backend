@@ -1,8 +1,11 @@
 import { Router } from '../utils/Router';
+
+// Controllers import
 import authController from '../controllers/authController';
 import productController from '../controllers/productController';
 import cartController from '../controllers/cartController';
 import orderController from '../controllers/orderController';
+import addressController from '../controllers/addressController';
 import swaggerSpec from '../config/swagger';
 
 import adminCategoryController from '../controllers/adminCategoryController';
@@ -25,6 +28,7 @@ authController(appRouter);
 productController(appRouter);
 cartController(appRouter);
 orderController(appRouter);
+addressController(appRouter);
 publicPromotionController(appRouter);
 publicBannerController(appRouter);
 
