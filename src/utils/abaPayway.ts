@@ -137,7 +137,7 @@ export const getCofPayload = (info: any) => {
   const payload = {
     req_time: req_time.toString(),
     merchant_id: ABA_PAYWAY_MERCHANT_ID.toString(),
-    ctid: info.ctid.toString(), // Customer identifier (e.g., userId)
+    ctid: `user_${info.ctid}`, // Use more unique ctid format
     return_param: (info.return_param || "").toString(),
     firstname: (info.firstname || "").toString(),
     lastname: (info.lastname || "").toString(),
