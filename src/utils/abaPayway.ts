@@ -112,7 +112,13 @@ export const generateCofHash = (payload: any): string => {
   const hashString =
     (payload.merchant_id || "") +
     (payload.ctid || "") +
-    (payload.return_param || "");
+    (payload.return_param || "") +
+    (payload.firstname || "") +
+    (payload.lastname || "") +
+    (payload.email || "") +
+    (payload.phone || "") +
+    (payload.return_url || "") +
+    (payload.continue_add_card_success_url || "");
 
   return crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
@@ -136,7 +142,7 @@ export const getCofPayload = (info: any) => {
   const payload = {
     req_time: req_time.toString(),
     merchant_id: ABA_PAYWAY_MERCHANT_ID.toString(),
-    ctid: (info.email || `customer_${info.ctid}`).toString(), // Use email for better validation
+    ctid: `user${info.ctid}`, // Pure alphanumeric, no special characters
     return_param: (info.return_param || "").toString(),
     firstname: (info.firstname || "").toString(),
     lastname: (info.lastname || "").toString(),
