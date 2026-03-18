@@ -169,6 +169,8 @@ export default function (appRouter: Router) {
             lastname,
             email,
             phone: "",
+            return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
+            view_type: "hosted",
           });
 
           responseData = {
