@@ -29,28 +29,29 @@ export const generatePwHash = (payload: any): string => {
     (payload.req_time || "") +
     (payload.merchant_id || "") +
     (payload.tran_id || "") +
-    (payload.amount || "") +
-    (payload.items || "") +
-    (payload.shipping || "") +
     (payload.firstname || "") +
     (payload.lastname || "") +
     (payload.email || "") +
     (payload.phone || "") +
     (payload.type || "") +
     (payload.payment_option || "") +
+    (payload.items || "") +
+    (payload.shipping || "") +
+    (payload.amount || "") +
+    (payload.currency || "") +
     (payload.return_url || "") +
     (payload.cancel_url || "") +
+    (payload.skip_success_page || "") +
     (payload.continue_success_url || "") +
     (payload.return_deeplink || "") +
-    (payload.currency || "") +
     (payload.custom_fields || "") +
     (payload.return_params || "") +
+    (payload.view_type || "") +
+    (payload.payment_gate || "") +
     (payload.payout || "") +
-    (payload.lifetime || "") +
     (payload.additional_params || "") +
-    (payload.google_pay_token || "") +
-    (payload.skip_success_page || "") +
-    (payload.view_type || "");
+    (payload.lifetime || "") +
+    (payload.google_pay_token || "");
 
   // Use API Key as the “key” for HMAC-SHA512
   return crypto
