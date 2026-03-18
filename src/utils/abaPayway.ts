@@ -70,31 +70,31 @@ export const getCheckoutPayload = (orderInfo: any) => {
   const items = Buffer.from(JSON.stringify(orderInfo.items)).toString("base64");
 
   const payload = {
-    req_time,
-    merchant_id: ABA_PAYWAY_MERCHANT_ID,
-    tran_id: orderInfo.tran_id,
-    amount: parseFloat(orderInfo.amount).toFixed(2),
+    req_time: req_time.toString(),
+    merchant_id: ABA_PAYWAY_MERCHANT_ID.toString(),
+    tran_id: orderInfo.tran_id.toString(),
+    amount: parseFloat(orderInfo.amount).toFixed(2).toString(),
     items,
     shipping: "0.00",
-    currency: orderInfo.currency || "USD",
-    firstname: orderInfo.firstname || "",
-    lastname: orderInfo.lastname || "",
-    email: orderInfo.email || "",
-    phone: orderInfo.phone || "",
+    currency: (orderInfo.currency || "USD").toString(),
+    firstname: (orderInfo.firstname || "").toString(),
+    lastname: (orderInfo.lastname || "").toString(),
+    email: (orderInfo.email || "").toString(),
+    phone: (orderInfo.phone || "").toString(),
     type: "purchase",
-    payment_option: orderInfo.payment_option || "",
-    return_url: process.env.ABA_RETURN_URL || "",
-    continue_success_url: process.env.ABA_SUCCESS_URL || "",
-    cancel_url: process.env.ABA_CANCEL_URL || "",
-    return_deeplink: orderInfo.return_deeplink || "",
-    custom_fields: orderInfo.custom_fields || "",
-    return_params: orderInfo.return_params || "",
-    payout: orderInfo.payout || "",
-    lifetime: orderInfo.lifetime || "",
-    additional_params: orderInfo.additional_params || "",
-    google_pay_token: orderInfo.google_pay_token || "",
-    skip_success_page: orderInfo.skip_success_page || "",
-    view_type: orderInfo.view_type || "hosted_view",
+    payment_option: (orderInfo.payment_option || "").toString(),
+    return_url: (process.env.ABA_RETURN_URL || "").toString(),
+    continue_success_url: (process.env.ABA_SUCCESS_URL || "").toString(),
+    cancel_url: (process.env.ABA_CANCEL_URL || "").toString(),
+    return_deeplink: (orderInfo.return_deeplink || "").toString(),
+    custom_fields: (orderInfo.custom_fields || "").toString(),
+    return_params: (orderInfo.return_params || "").toString(),
+    payout: (orderInfo.payout || "").toString(),
+    lifetime: (orderInfo.lifetime || "").toString(),
+    additional_params: (orderInfo.additional_params || "").toString(),
+    google_pay_token: (orderInfo.google_pay_token || "").toString(),
+    skip_success_page: (orderInfo.skip_success_page || "").toString(),
+    view_type: (orderInfo.view_type || "hosted_view").toString(),
   };
 
   const hash = generatePwHash(payload);
@@ -135,16 +135,16 @@ export const getCofPayload = (info: any) => {
     dt.getSeconds().toString().padStart(2, "0");
 
   const payload = {
-    req_time,
-    merchant_id: ABA_PAYWAY_MERCHANT_ID,
-    ctid: info.ctid, // Customer identifier (e.g., userId)
-    return_param: info.return_param || "",
-    firstname: info.firstname || "",
-    lastname: info.lastname || "",
-    email: info.email || "",
-    phone: info.phone || "",
-    return_url: process.env.ABA_RETURN_URL || "",
-    continue_add_card_success_url: process.env.ABA_SUCCESS_URL || "",
+    req_time: req_time.toString(),
+    merchant_id: ABA_PAYWAY_MERCHANT_ID.toString(),
+    ctid: info.ctid.toString(), // Customer identifier (e.g., userId)
+    return_param: (info.return_param || "").toString(),
+    firstname: (info.firstname || "").toString(),
+    lastname: (info.lastname || "").toString(),
+    email: (info.email || "").toString(),
+    phone: (info.phone || "").toString(),
+    return_url: (process.env.ABA_RETURN_URL || "").toString(),
+    continue_add_card_success_url: (process.env.ABA_SUCCESS_URL || "").toString(),
   };
 
   const hash = generateCofHash(payload);
