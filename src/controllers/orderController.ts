@@ -170,7 +170,7 @@ export default function (appRouter: Router) {
             email,
             phone: "",
             return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
-            view_type: "hosted",
+            view_type: "hosted_view",
           });
 
           responseData = {
@@ -365,7 +365,7 @@ export default function (appRouter: Router) {
           phone: "",
           payment_option: paymentOption || "",
           return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
-          view_type: "hosted",
+          view_type: "hosted_view",
         });
 
         appRouter.sendResponse(res, 200, {

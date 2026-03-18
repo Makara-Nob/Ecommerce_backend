@@ -91,7 +91,7 @@ export const getCheckoutPayload = (orderInfo: any) => {
     additional_params: orderInfo.additional_params || "",
     google_pay_token: orderInfo.google_pay_token || "",
     skip_success_page: orderInfo.skip_success_page || "",
-    view_type: orderInfo.view_type || "hosted",
+    view_type: orderInfo.view_type || "hosted_view",
   };
 
   const hash = generatePwHash(payload);
