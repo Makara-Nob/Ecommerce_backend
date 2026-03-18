@@ -286,6 +286,99 @@ export default function (appRouter: Router) {
     },
   );
 
+  // @desc    Get ABA PayWay payload for existing order
+  // @route   POST /api/v1/orders/:id/payway-payload
+  // @access  Private
+  /**
+   * @swagger
+   * /api/v1/orders/{id}/payway-payload:
+   *   post:
+   *     summary: Get PayWay payload for existing order
+   *     tags: [Orders]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               paymentOption:
+   *                 type: string
+   *                 example: abakhqr
+   *     responses:
+   *       200:
+   *         description: Payload generated
+   */
+  appRouter.post(
+    "/api/v1/orders/:id/payway-payload",
+    async (req: IncomingMessage & { params?: any }, res: ServerResponse) => {
+      try {
+        const userId = await protect(req, res, appRouter);
+        if (!userId) return;
+
+        const { paymentOption } = await appRouter.parseJsonBody(req);
+        
+        const order = await Order.findById(req.params.id);
+        if (!order) {
+          return appRouter.sendResponse(res, 404, { message: "Order not found" });
+        }
+        if (order.userId !== userId) {
+          return appRouter.sendResponse(res, 403, { message: "Not authorized" });
+        }
+
+        if (!order.paywayTranId) {
+          const dt = new Date();
+          const randomStr = Math.floor(100000 + Math.random() * 900000).toString();
+          order.paywayTranId =
+            dt.getFullYear().toString() +
+            (dt.getMonth() + 1).toString().padStart(2, "0") +
+            dt.getDate().toString().padStart(2, "0") +
+            randomStr;
+          await order.save();
+        }
+
+        const user = await User.findById(userId);
+        const fallbackNames = user && user.fullName ? user.fullName.split(" ") : ["Customer", ""];
+        const firstname = fallbackNames[0];
+        const lastname = fallbackNames.slice(1).join(" ") || "";
+        const email = user ? user.email : "";
+
+        const paywayItems = order.items.map((i: any) => ({
+          name: `Product_${i.product}`,
+          quantity: i.quantity,
+          price: parseFloat(i.unitPrice).toFixed(2),
+        }));
+
+        const paywayPayload = getCheckoutPayload({
+          tran_id: order.paywayTranId,
+          amount: order.netAmount,
+          items: paywayItems,
+          firstname,
+          lastname,
+          email,
+          phone: "",
+          payment_option: paymentOption || "",
+          return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
+          view_type: "hosted",
+        });
+
+        appRouter.sendResponse(res, 200, {
+          paywayPayload,
+          paywayApiUrl: ABA_PAYWAY_API_URL,
+        });
+
+      } catch (e: any) {
+        appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
+      }
+    }
+  );
+
   // @desc    Check payment status manually
   // @route   POST /api/v1/orders/:id/check-payment
   // @access  Private
