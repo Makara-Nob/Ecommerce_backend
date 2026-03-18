@@ -112,13 +112,7 @@ export const generateCofHash = (payload: any): string => {
   const hashString =
     (payload.merchant_id || "") +
     (payload.ctid || "") +
-    (payload.return_param || "") +
-    (payload.firstname || "") +
-    (payload.lastname || "") +
-    (payload.email || "") +
-    (payload.phone || "") +
-    (payload.return_url || "") +
-    (payload.continue_add_card_success_url || "");
+    (payload.return_param || "");
 
   return crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
