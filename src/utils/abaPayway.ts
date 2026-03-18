@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import axios from "axios"; // Added for purchaseByToken function
 
 // Sandbox / API URL
 export const ABA_PAYWAY_API_URL =
@@ -7,6 +8,9 @@ export const ABA_PAYWAY_API_URL =
 
 export const ABA_PAYWAY_COF_URL =
   "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/cof/initial";
+
+export const ABA_PAYWAY_TOKEN_URL = "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase-by-token";
+export const ABA_PAYWAY_CHECK_URL = "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/check-transaction-2";
 
 // Merchant ID
 const ABA_PAYWAY_MERCHANT_ID = process.env.ABA_PAYWAY_MERCHANT_ID || "";
@@ -95,7 +99,6 @@ export const getCheckoutPayload = (orderInfo: any) => {
     additional_params: (orderInfo.additional_params || "").toString(),
     google_pay_token: (orderInfo.google_pay_token || "").toString(),
     skip_success_page: (orderInfo.skip_success_page || "").toString(),
-    view_type: (orderInfo.view_type || "hosted").toString(),
   };
 
   const hash = generatePwHash(payload);
@@ -225,6 +228,70 @@ export const checkAbaTransaction = async (tran_id: string) => {
   }
 
   return await response.json();
+};
+
+/**
+ * Generate HMAC-SHA512 hash for Purchase by Token API
+ */
+export const generateTokenHash = (payload: any): string => {
+  const hashString =
+    (payload.req_time || "") +
+    (payload.merchant_id || "") +
+    (payload.tran_id || "") +
+    (payload.amount || "") +
+    (payload.items || "") +
+    (payload.pwt || "");
+
+  return crypto
+    .createHmac("sha512", ABA_PAYWAY_API_KEY)
+    .update(hashString)
+    .digest("base64");
+};
+
+/**
+ * Perform purchase using a saved card token (PWT)
+ */
+export const purchaseByToken = async (params: {
+  tran_id: string;
+  amount: string | number;
+  items: any[];
+  pwt: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  return_param?: string;
+}) => {
+  const dt = new Date();
+  const req_time =
+    dt.getFullYear().toString() +
+    (dt.getMonth() + 1).toString().padStart(2, "0") +
+    dt.getDate().toString().padStart(2, "0") +
+    dt.getHours().toString().padStart(2, "0") +
+    dt.getMinutes().toString().padStart(2, "0") +
+    dt.getSeconds().toString().padStart(2, "0");
+
+  const items = Buffer.from(JSON.stringify(params.items)).toString("base64");
+
+  const payload: any = {
+    req_time,
+    merchant_id: ABA_PAYWAY_MERCHANT_ID,
+    tran_id: params.tran_id.toString(),
+    amount: parseFloat(params.amount.toString()).toFixed(2).toString(),
+    items,
+    pwt: params.pwt,
+    firstname: params.firstname,
+    lastname: params.lastname,
+    email: params.email,
+    return_param: (params.return_param || "").toString(),
+  };
+
+  payload.hash = generateTokenHash(payload);
+
+  const response = await axios.post(ABA_PAYWAY_TOKEN_URL, payload, {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  return response.data;
 };
 
 // Export private key for any signing operations if needed

@@ -9,6 +9,7 @@ import {
   getCofPayload,
   verifyWebhookSignature,
   checkAbaTransaction,
+  purchaseByToken,
   ABA_PAYWAY_API_URL,
   ABA_PAYWAY_COF_URL,
 } from "../utils/abaPayway";
@@ -507,30 +508,75 @@ export default function (appRouter: Router) {
           );
 
           if (tran_id) {
-            const order = await Order.findOne({ paywayTranId: tran_id });
-            if (order) {
-              if (status === "0" && order.status === "PENDING") {
-                order.status = "CONFIRMED";
-                order.paywayStatus = "APPROVED";
-                await order.save();
-              } else if (status !== "0" && order.status === "PENDING") {
-                order.status = "CANCELLED";
-                order.paywayStatus = `DECLINED_${status}`;
+            // Check if this is a Link Card (COF) callback by looking for pwt
+            const returnParams = payload.return_params;
+            const pwt = returnParams?.card_status?.pwt;
+            
+            if (pwt) {
+              // Option #1: Link Card (COF) Flow
+              const orderId = returnParams.return_param; // We passed order ID here
+              const order = await Order.findById(orderId);
+              
+              if (order && order.status === "PENDING") {
+                console.log(`[ABA Webhook] Card linked for order ${orderId}. Executing purchaseByToken...`);
+                
+                // Fetch user for name/email
+                const user = await User.findById(order.userId);
+                
+                try {
+                  const purchaseResult = await purchaseByToken({
+                    tran_id: order.paywayTranId,
+                    amount: order.netAmount,
+                    items: order.items.map((i: any) => ({
+                      name: "Product", // Ideal to populate product name
+                      quantity: i.quantity,
+                      price: parseFloat(i.unitPrice).toFixed(2),
+                    })),
+                    pwt: pwt,
+                    firstname: user?.fullName || "Customer",
+                    lastname: "",
+                    email: user?.email || "",
+                    return_param: String(order.id),
+                  });
 
-                // Restock items
-                for (const item of order.items) {
-                  const product = await Product.findById(item.product);
-                  if (product) {
-                    product.quantity += item.quantity;
-                    await product.save();
+                  if (purchaseResult?.payment_status?.status === "0") {
+                    order.status = "CONFIRMED";
+                    order.paywayStatus = "APPROVED";
+                    await order.save();
+                    console.log(`[ABA Webhook] Purchase successful for order ${orderId}`);
+                  } else {
+                    console.error(`[ABA Webhook] Purchase failed for order ${orderId}:`, purchaseResult);
+                    order.status = "CANCELLED";
+                    order.paywayStatus = `TOKEN_PAY_FAILED_${purchaseResult?.payment_status?.code}`;
+                    await order.save();
                   }
+                } catch (tokenErr) {
+                  console.error("[ABA Webhook] purchaseByToken Error:", tokenErr);
                 }
-                await order.save();
               }
             } else {
-              console.error(
-                `[ABA Webhook] Order with tran_id ${tran_id} not found`,
-              );
+              // OPTION #2: Standard Purchase callback
+              const order = await Order.findOne({ paywayTranId: tran_id });
+              if (order) {
+                if (status === "0" && order.status === "PENDING") {
+                  order.status = "CONFIRMED";
+                  order.paywayStatus = "APPROVED";
+                  await order.save();
+                } else if (status !== "0" && order.status === "PENDING") {
+                  order.status = "CANCELLED";
+                  order.paywayStatus = `DECLINED_${status}`;
+
+                  // Restock items
+                  for (const item of order.items) {
+                    const product = await Product.findById(item.product);
+                    if (product) {
+                      product.quantity += item.quantity;
+                      await product.save();
+                    }
+                  }
+                  await order.save();
+                }
+              }
             }
           }
 
