@@ -45,7 +45,8 @@ export const generatePwHash = (payload: any): string => {
     (payload.lifetime || "") +
     (payload.additional_params || "") +
     (payload.google_pay_token || "") +
-    (payload.skip_success_page || "");
+    (payload.skip_success_page || "") +
+    (payload.view_type || "");
 
   // Use API Key as the “key” for HMAC-SHA512
   return crypto
@@ -134,9 +135,8 @@ export const getCofPayload = (info: any) => {
     dt.getSeconds().toString().padStart(2, "0");
 
   const payload = {
-    req_time: req_time.toString(),
     merchant_id: ABA_PAYWAY_MERCHANT_ID.toString(),
-    ctid: `user${info.ctid}`, // Pure alphanumeric, no special characters
+    ctid: `user${info.ctid}`, // Pure alphanumeric
     return_param: (info.return_param || "").toString(),
     firstname: (info.firstname || "").toString(),
     lastname: (info.lastname || "").toString(),

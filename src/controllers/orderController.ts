@@ -357,22 +357,40 @@ export default function (appRouter: Router) {
           price: parseFloat(i.unitPrice).toFixed(2),
         }));
 
-        const paywayPayload = getCheckoutPayload({
-          tran_id: order.paywayTranId,
-          amount: order.netAmount,
-          items: paywayItems,
-          firstname,
-          lastname,
-          email,
-          phone: "",
-          payment_option: paymentOption || "",
-          return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
-          view_type: "hosted", // Use corrected view_type
-        });
+        let paywayPayload;
+        let paywayApiUrl;
+
+        if (paymentOption === "cards") {
+          // Use refined Link Card (COF) flow
+          paywayPayload = getCofPayload({
+            ctid: userId,
+            return_param: order.id,
+            firstname,
+            lastname,
+            email,
+            phone: "",
+          });
+          paywayApiUrl = ABA_PAYWAY_COF_URL;
+        } else {
+          // Standard Purchase flow for KHQR
+          paywayPayload = getCheckoutPayload({
+            tran_id: order.paywayTranId,
+            amount: order.netAmount,
+            items: paywayItems,
+            firstname,
+            lastname,
+            email,
+            phone: "",
+            payment_option: paymentOption || "",
+            return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
+            view_type: "hosted",
+          });
+          paywayApiUrl = ABA_PAYWAY_API_URL;
+        }
 
         appRouter.sendResponse(res, 200, {
           paywayPayload,
-          paywayApiUrl: ABA_PAYWAY_API_URL,
+          paywayApiUrl,
         });
 
       } catch (e: any) {
