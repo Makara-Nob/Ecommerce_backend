@@ -5,6 +5,9 @@ export const ABA_PAYWAY_API_URL =
   process.env.ABA_PAYWAY_API_URL ||
   "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase";
 
+export const ABA_PAYWAY_COF_URL =
+  "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/cof/initial";
+
 // Merchant ID
 const ABA_PAYWAY_MERCHANT_ID = process.env.ABA_PAYWAY_MERCHANT_ID || "";
 
@@ -95,6 +98,56 @@ export const getCheckoutPayload = (orderInfo: any) => {
   };
 
   const hash = generatePwHash(payload);
+
+  return {
+    ...payload,
+    hash,
+  };
+};
+
+/**
+ * Generate HMAC-SHA512 hash for ABA Link Card (COF) payload
+ */
+export const generateCofHash = (payload: any): string => {
+  const hashString =
+    (payload.req_time || "") +
+    (payload.merchant_id || "") +
+    (payload.ctid || "") +
+    (payload.return_param || "");
+
+  return crypto
+    .createHmac("sha512", ABA_PAYWAY_API_KEY)
+    .update(hashString)
+    .digest("base64");
+};
+
+/**
+ * Get the payload for Link Card (COF) initialization
+ */
+export const getCofPayload = (info: any) => {
+  const dt = new Date();
+  const req_time =
+    dt.getFullYear().toString() +
+    (dt.getMonth() + 1).toString().padStart(2, "0") +
+    dt.getDate().toString().padStart(2, "0") +
+    dt.getHours().toString().padStart(2, "0") +
+    dt.getMinutes().toString().padStart(2, "0") +
+    dt.getSeconds().toString().padStart(2, "0");
+
+  const payload = {
+    req_time,
+    merchant_id: ABA_PAYWAY_MERCHANT_ID,
+    ctid: info.ctid, // Customer identifier (e.g., userId)
+    return_param: info.return_param || "",
+    firstname: info.firstname || "",
+    lastname: info.lastname || "",
+    email: info.email || "",
+    phone: info.phone || "",
+    return_url: process.env.ABA_RETURN_URL || "",
+    continue_add_card_success_url: process.env.ABA_SUCCESS_URL || "",
+  };
+
+  const hash = generateCofHash(payload);
 
   return {
     ...payload,

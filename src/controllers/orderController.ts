@@ -6,9 +6,11 @@ import { Router } from "../utils/Router";
 import { IncomingMessage, ServerResponse } from "http";
 import {
   getCheckoutPayload,
+  getCofPayload,
   verifyWebhookSignature,
   checkAbaTransaction,
   ABA_PAYWAY_API_URL,
+  ABA_PAYWAY_COF_URL,
 } from "../utils/abaPayway";
 import User from "../models/User";
 
@@ -355,22 +357,40 @@ export default function (appRouter: Router) {
           price: parseFloat(i.unitPrice).toFixed(2),
         }));
 
-        const paywayPayload = getCheckoutPayload({
-          tran_id: order.paywayTranId,
-          amount: order.netAmount,
-          items: paywayItems,
-          firstname,
-          lastname,
-          email,
-          phone: "",
-          payment_option: paymentOption || "",
-          return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
-          view_type: "hosted_view",
-        });
+        let paywayPayload;
+        let paywayApiUrl;
+
+        if (paymentOption === "cards") {
+          // Use Link Card (COF) endpoint for direct card form
+          paywayPayload = getCofPayload({
+            ctid: userId,
+            return_param: order.id, // Pass order ID to identify in webhook/return
+            firstname,
+            lastname,
+            email,
+            phone: "",
+          });
+          paywayApiUrl = ABA_PAYWAY_COF_URL;
+        } else {
+          // Use standard Purchase endpoint for KHQR (and others)
+          paywayPayload = getCheckoutPayload({
+            tran_id: order.paywayTranId,
+            amount: order.netAmount,
+            items: paywayItems,
+            firstname,
+            lastname,
+            email,
+            phone: "",
+            payment_option: paymentOption || "",
+            return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
+            view_type: "hosted_view",
+          });
+          paywayApiUrl = ABA_PAYWAY_API_URL;
+        }
 
         appRouter.sendResponse(res, 200, {
           paywayPayload,
-          paywayApiUrl: ABA_PAYWAY_API_URL,
+          paywayApiUrl,
         });
 
       } catch (e: any) {
