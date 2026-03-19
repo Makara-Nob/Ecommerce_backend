@@ -239,23 +239,45 @@ export const checkAbaTransaction = async (tran_id: string) => {
 export const verifyWebhookSignature = (
   payload: any,
   received: string
-) => {
-  const keys = Object.keys(payload).sort();
+): boolean => {
+  // ABA PayWay's fixed field order for webhook/return-URL hash verification.
+  // Fields must be in THIS exact order — do NOT sort alphabetically.
+  const FIELD_ORDER = [
+    "tran_id",
+    "status",
+    "apv",
+    "payment_status",
+    "payment_option",
+    "amount",
+    "currency",
+    "merchant_id",
+    "items",
+    "custom_fields",
+    "return_params",
+  ];
 
-  let str = "";
-  for (const k of keys) {
-    const val = payload[k];
-    if (val !== null && typeof val === "object") {
-      str += JSON.stringify(val);
-    } else {
-      str += (val ?? "").toString();
-    }
-  }
+  const hashString = FIELD_ORDER
+    .map((k) => {
+      const val = payload[k];
+      if (val === undefined || val === null) return "";
+      if (typeof val === "object") return JSON.stringify(val);
+      return val.toString();
+    })
+    .join("");
 
   const expected = crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
-    .update(str)
-    .digest("base64"); // ✅ MUST BE BASE64
+    .update(hashString)
+    .digest("base64");
 
-  return expected === received;
+  console.log("[ABA] Webhook hash string:", hashString);
+  console.log("[ABA] Expected hash:", expected);
+  console.log("[ABA] Received hash:", received);
+
+  // Use timingSafeEqual to prevent timing attacks
+  const expectedBuf = Buffer.from(expected);
+  const receivedBuf = Buffer.from(received);
+  if (expectedBuf.length !== receivedBuf.length) return false;
+
+  return crypto.timingSafeEqual(expectedBuf, receivedBuf);
 };
