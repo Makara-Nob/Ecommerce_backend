@@ -40,7 +40,6 @@ export const generatePwHash = (p: any): string => {
     (p.amount ?? "") +
     (p.items ?? "") +
     (p.shipping ?? "") +
-    (p.currency ?? "") +
     (p.firstname ?? "") +
     (p.lastname ?? "") +
     (p.email ?? "") +
@@ -48,25 +47,25 @@ export const generatePwHash = (p: any): string => {
     (p.type ?? "") +
     (p.payment_option ?? "") +
     (p.return_url ?? "") +
-    (p.continue_success_url ?? "") +
     (p.cancel_url ?? "") +
+    (p.continue_success_url ?? "") +
     (p.return_deeplink ?? "") +
+    (p.currency ?? "") +
     (p.custom_fields ?? "") +
     (p.return_params ?? "") +
     (p.payout ?? "") +
     (p.lifetime ?? "") +
     (p.additional_params ?? "") +
     (p.google_pay_token ?? "") +
-    (p.skip_success_page ?? "") +
-    (p.payment_gate ?? "");
+    (p.skip_success_page ?? "");
 
   const hash = crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
     .update(hashString)
-    .digest("hex"); // ✅ MUST BE HEX
+    .digest("base64"); // ✅ MUST BE BASE64 for Checkout 2.0
 
   console.log("[ABA] HASH STRING:", hashString);
-  console.log("[ABA] HASH:", hash);
+  console.log("[ABA] HASH (Base64):", hash);
 
   return hash;
 };
@@ -115,12 +114,13 @@ export const generateCofHash = (p: any): string => {
   const hashString =
     (p.merchant_id ?? "") +
     (p.ctid ?? "") +
-    (p.return_param ?? "");
+    (p.return_param ?? "") +
+    (p.return_url ?? "");
 
   return crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
     .update(hashString)
-    .digest("hex"); // ✅ FIXED
+    .digest("base64"); // ✅ FIXED
 };
 
 // ================= COF PAYLOAD =================
@@ -151,12 +151,24 @@ export const generateTokenHash = (p: any): string => {
     (p.tran_id ?? "") +
     (p.amount ?? "") +
     (p.items ?? "") +
-    (p.pwt ?? "");
+    (p.shipping ?? "") +
+    (p.ctid ?? "") +
+    (p.pwt ?? "") +
+    (p.firstname ?? "") +
+    (p.lastname ?? "") +
+    (p.email ?? "") +
+    (p.phone ?? "") +
+    (p.type ?? "") +
+    (p.return_url ?? "") +
+    (p.currency ?? "") +
+    (p.custom_fields ?? "") +
+    (p.return_params ?? "") +
+    (p.payout ?? "");
 
   return crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
     .update(hashString)
-    .digest("hex"); // ✅ FIXED
+    .digest("base64"); // ✅ FIXED
 };
 
 // ================= PURCHASE BY TOKEN =================
@@ -171,11 +183,19 @@ export const purchaseByToken = async (params: any) => {
     tran_id: params.tran_id.toString(),
     amount: parseFloat(params.amount).toFixed(2),
     items: itemsBase64,
-    pwt: params.pwt,
-    firstname: params.firstname,
-    lastname: params.lastname,
-    email: params.email,
-    return_param: params.return_param || "",
+    shipping: params.shipping || "0.00",
+    ctid: params.ctid || "",
+    pwt: params.pwt || "",
+    firstname: params.firstname || "",
+    lastname: params.lastname || "",
+    email: params.email || "",
+    phone: params.phone || "",
+    type: params.type || "purchase",
+    return_url: params.return_url || process.env.ABA_RETURN_URL || "",
+    currency: params.currency || "USD",
+    custom_fields: params.custom_fields || "",
+    return_params: params.return_params || "",
+    payout: params.payout || "",
   };
 
   payload.hash = generateTokenHash(payload);
@@ -196,7 +216,7 @@ export const checkAbaTransaction = async (tran_id: string) => {
   const hash = crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
     .update(hashString)
-    .digest("hex"); // ✅ FIXED
+    .digest("base64"); // ✅ FIXED
 
   const form = new URLSearchParams();
   form.append("req_time", req_time);
@@ -224,13 +244,18 @@ export const verifyWebhookSignature = (
 
   let str = "";
   for (const k of keys) {
-    str += (payload[k] ?? "").toString();
+    const val = payload[k];
+    if (val !== null && typeof val === "object") {
+      str += JSON.stringify(val);
+    } else {
+      str += (val ?? "").toString();
+    }
   }
 
   const expected = crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
     .update(str)
-    .digest("hex"); // ✅ FIXED
+    .digest("base64"); // ✅ MUST BE BASE64
 
   return expected === received;
 };
