@@ -1,7 +1,7 @@
 import crypto from "crypto";
-import axios from "axios"; // Added for purchaseByToken function
+import axios from "axios";
 
-// Sandbox / API URL
+// ================= CONFIG =================
 export const ABA_PAYWAY_API_URL =
   process.env.ABA_PAYWAY_API_URL ||
   "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase";
@@ -9,281 +9,228 @@ export const ABA_PAYWAY_API_URL =
 export const ABA_PAYWAY_COF_URL =
   "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/cof/initial";
 
-export const ABA_PAYWAY_TOKEN_URL = "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase-by-token";
-export const ABA_PAYWAY_CHECK_URL = "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/check-transaction-2";
+export const ABA_PAYWAY_TOKEN_URL =
+  "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase-by-token";
 
-// Merchant ID
+export const ABA_PAYWAY_CHECK_URL =
+  "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/check-transaction-2";
+
 const ABA_PAYWAY_MERCHANT_ID = process.env.ABA_PAYWAY_MERCHANT_ID || "";
-
-// Use the API Key for HMAC hash generation
 const ABA_PAYWAY_API_KEY = process.env.ABA_PAYWAY_API_KEY || "";
 
-// Private key variable (for signing if needed)
-const ABA_PAYWAY_PRIVATE_KEY = process.env.ABA_RSA_PRIVATE_KEY || "";
-
-/**
- * Generate HMAC-SHA512 hash for ABA PayWay checkout payload
- */
-export const generatePwHash = (payload: any): string => {
-  // Sort fields by key (ascending)
-  const keys = Object.keys(payload).sort();
-
-  // Concatenate all values except 'hash'
-  let hashString = "";
-  for (const key of keys) {
-    if (key === "hash") continue;
-    const value = payload[key];
-    if (value !== undefined && value !== null) {
-      hashString += value.toString();
-    }
-  }
-
-  const result = crypto
-    .createHmac("sha512", ABA_PAYWAY_API_KEY)
-    .update(hashString)
-    .digest("base64");
-
-  console.log(`[ABA] Final Hash String (Sorted): "${hashString}"`);
-  console.log(`[ABA] Generated Hash: ${result}`);
-
-  return result;
-};
-
-/**
- * Get the full payload to render the checkout form
- */
-export const getCheckoutPayload = (orderInfo: any) => {
+// ================= HELPERS =================
+const getReqTime = () => {
   const dt = new Date();
-  const req_time =
+  return (
     dt.getFullYear().toString() +
     (dt.getMonth() + 1).toString().padStart(2, "0") +
     dt.getDate().toString().padStart(2, "0") +
     dt.getHours().toString().padStart(2, "0") +
     dt.getMinutes().toString().padStart(2, "0") +
-    dt.getSeconds().toString().padStart(2, "0");
+    dt.getSeconds().toString().padStart(2, "0")
+  );
+};
 
-  const items = Buffer.from(JSON.stringify(orderInfo.items)).toString("base64");
+// ================= CHECKOUT HASH (FIXED) =================
+export const generatePwHash = (p: any): string => {
+  const hashString =
+    (p.req_time ?? "") +
+    (p.merchant_id ?? "") +
+    (p.tran_id ?? "") +
+    (p.amount ?? "") +
+    (p.items ?? "") +
+    (p.shipping ?? "") +
+    (p.currency ?? "") +
+    (p.firstname ?? "") +
+    (p.lastname ?? "") +
+    (p.email ?? "") +
+    (p.phone ?? "") +
+    (p.type ?? "") +
+    (p.payment_option ?? "") +
+    (p.return_url ?? "") +
+    (p.continue_success_url ?? "") +
+    (p.cancel_url ?? "") +
+    (p.return_deeplink ?? "") +
+    (p.custom_fields ?? "") +
+    (p.return_params ?? "") +
+    (p.payout ?? "") +
+    (p.lifetime ?? "") +
+    (p.additional_params ?? "") +
+    (p.google_pay_token ?? "") +
+    (p.skip_success_page ?? "") +
+    (p.payment_gate ?? "");
+
+  const hash = crypto
+    .createHmac("sha512", ABA_PAYWAY_API_KEY)
+    .update(hashString)
+    .digest("hex"); // ✅ MUST BE HEX
+
+  console.log("[ABA] HASH STRING:", hashString);
+  console.log("[ABA] HASH:", hash);
+
+  return hash;
+};
+
+// ================= CHECKOUT PAYLOAD =================
+export const getCheckoutPayload = (orderInfo: any) => {
+  const itemsBase64 = Buffer.from(
+    JSON.stringify(orderInfo.items)
+  ).toString("base64");
 
   const payload = {
-    req_time: req_time.toString(),
-    merchant_id: ABA_PAYWAY_MERCHANT_ID.toString(),
+    req_time: getReqTime(),
+    merchant_id: ABA_PAYWAY_MERCHANT_ID,
     tran_id: orderInfo.tran_id.toString(),
-    amount: parseFloat(orderInfo.amount).toFixed(2).toString(),
-    items,
+    amount: parseFloat(orderInfo.amount).toFixed(2),
+    items: itemsBase64,
     shipping: "0.00",
-    currency: (orderInfo.currency || "USD").toString(),
-    firstname: (orderInfo.firstname || "").toString(),
-    lastname: (orderInfo.lastname || "").toString(),
-    email: (orderInfo.email || "").toString(),
-    phone: (orderInfo.phone || "").toString(),
+    currency: orderInfo.currency || "USD",
+    firstname: orderInfo.firstname || "",
+    lastname: orderInfo.lastname || "",
+    email: orderInfo.email || "",
+    phone: orderInfo.phone || "",
     type: "purchase",
-    payment_option: (orderInfo.payment_option || "").toString(),
-    return_url: (process.env.ABA_RETURN_URL || "").toString(),
-    continue_success_url: (process.env.ABA_SUCCESS_URL || "").toString(),
-    cancel_url: (process.env.ABA_CANCEL_URL || "").toString(),
-    return_deeplink: (orderInfo.return_deeplink || "").toString(),
-    custom_fields: (orderInfo.custom_fields || "").toString(),
-    return_params: (orderInfo.return_params || "").toString(),
-    payout: (orderInfo.payout || "").toString(),
-    lifetime: (orderInfo.lifetime || "").toString(),
-    additional_params: (orderInfo.additional_params || "").toString(),
-    google_pay_token: (orderInfo.google_pay_token || "").toString(),
-    skip_success_page: (orderInfo.skip_success_page || "").toString(),
-    payment_gate: (orderInfo.payment_gate || "").toString(),
+    payment_option: orderInfo.payment_option || "",
+    return_url: process.env.ABA_RETURN_URL || "",
+    continue_success_url: process.env.ABA_SUCCESS_URL || "",
+    cancel_url: process.env.ABA_CANCEL_URL || "",
+    return_deeplink: orderInfo.return_deeplink || "",
+    custom_fields: orderInfo.custom_fields || "",
+    return_params: orderInfo.return_params || "",
+    payout: orderInfo.payout || "",
+    lifetime: orderInfo.lifetime || "",
+    additional_params: orderInfo.additional_params || "",
+    google_pay_token: orderInfo.google_pay_token || "",
+    skip_success_page: orderInfo.skip_success_page || "",
+    payment_gate: orderInfo.payment_gate || "",
   };
 
   const hash = generatePwHash(payload);
 
-  return {
-    ...payload,
-    hash,
-  };
+  return { ...payload, hash };
 };
 
-/**
- * Generate HMAC-SHA512 hash for ABA Link Card (COF) payload
- */
-export const generateCofHash = (payload: any): string => {
+// ================= COF HASH =================
+export const generateCofHash = (p: any): string => {
   const hashString =
-    (payload.merchant_id || "") +
-    (payload.ctid || "") +
-    (payload.return_param || "");
+    (p.merchant_id ?? "") +
+    (p.ctid ?? "") +
+    (p.return_param ?? "");
 
   return crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
     .update(hashString)
-    .digest("base64");
+    .digest("hex"); // ✅ FIXED
 };
 
-/**
- * Get the payload for Link Card (COF) initialization
- */
+// ================= COF PAYLOAD =================
 export const getCofPayload = (info: any) => {
-  const dt = new Date();
-  const req_time =
-    dt.getFullYear().toString() +
-    (dt.getMonth() + 1).toString().padStart(2, "0") +
-    dt.getDate().toString().padStart(2, "0") +
-    dt.getHours().toString().padStart(2, "0") +
-    dt.getMinutes().toString().padStart(2, "0") +
-    dt.getSeconds().toString().padStart(2, "0");
-
   const payload = {
-    merchant_id: ABA_PAYWAY_MERCHANT_ID.toString(),
-    ctid: `user${info.ctid}`, // Pure alphanumeric
-    return_param: (info.return_param || "").toString(),
-    firstname: (info.firstname || "").toString(),
-    lastname: (info.lastname || "").toString(),
-    email: (info.email || "").toString(),
-    phone: (info.phone || "").toString(),
-    return_url: (process.env.ABA_RETURN_URL || "").toString(),
-    continue_add_card_success_url: (process.env.ABA_SUCCESS_URL || "").toString(),
+    merchant_id: ABA_PAYWAY_MERCHANT_ID,
+    ctid: `user${info.ctid}`,
+    return_param: info.return_param || "",
+    firstname: info.firstname || "",
+    lastname: info.lastname || "",
+    email: info.email || "",
+    phone: info.phone || "",
+    return_url: process.env.ABA_RETURN_URL || "",
+    continue_add_card_success_url: process.env.ABA_SUCCESS_URL || "",
   };
-
-  const hash = generateCofHash(payload);
 
   return {
     ...payload,
-    hash,
+    hash: generateCofHash(payload),
   };
 };
 
-/**
- * Verify webhook signature from ABA PayWay Checkout 2.0
- */
-export const verifyWebhookSignature = (
-  payload: any,
-  receivedSignature: string,
-) => {
-  // 1. Sort fields by key (ascending)
-  const keys = Object.keys(payload).sort();
-
-  // 2. Concatenate all values
-  let b4hash = "";
-  for (const key of keys) {
-    const value = payload[key];
-    if (typeof value === "object" && value !== null) {
-      b4hash += JSON.stringify(value);
-    } else {
-      b4hash += value;
-    }
-  }
-
-  // 3. Generate HMAC-SHA512 signature
-  const expectedSignature = crypto
-    .createHmac("sha512", ABA_PAYWAY_API_KEY)
-    .update(b4hash)
-    .digest("base64");
-
-  // 4. Compare signatures
-  return expectedSignature === receivedSignature;
-};
-
-/**
- * Check transaction status using ABA Payway check-transaction-2 API
- */
-export const checkAbaTransaction = async (tran_id: string) => {
-  const dt = new Date();
-  const req_time =
-    dt.getFullYear().toString() +
-    (dt.getMonth() + 1).toString().padStart(2, "0") +
-    dt.getDate().toString().padStart(2, "0") +
-    dt.getHours().toString().padStart(2, "0") +
-    dt.getMinutes().toString().padStart(2, "0") +
-    dt.getSeconds().toString().padStart(2, "0");
-
-  const hashString = req_time + ABA_PAYWAY_MERCHANT_ID + tran_id;
-  const hash = crypto
-    .createHmac("sha512", ABA_PAYWAY_API_KEY)
-    .update(hashString)
-    .digest("base64");
-
-  const checkUrl = "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/check-transaction-2";
-
-  const formData = new URLSearchParams();
-  formData.append("req_time", req_time);
-  formData.append("merchant_id", ABA_PAYWAY_MERCHANT_ID);
-  formData.append("tran_id", tran_id);
-  formData.append("hash", hash);
-
-  const response = await fetch(checkUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: formData.toString()
-  });
-
-  if (!response.ok) {
-    throw new Error(`ABA API returned ${response.status}`);
-  }
-
-  return await response.json();
-};
-
-/**
- * Generate HMAC-SHA512 hash for Purchase by Token API
- */
-export const generateTokenHash = (payload: any): string => {
+// ================= TOKEN HASH =================
+export const generateTokenHash = (p: any): string => {
   const hashString =
-    (payload.req_time || "") +
-    (payload.merchant_id || "") +
-    (payload.tran_id || "") +
-    (payload.amount || "") +
-    (payload.items || "") +
-    (payload.pwt || "");
+    (p.req_time ?? "") +
+    (p.merchant_id ?? "") +
+    (p.tran_id ?? "") +
+    (p.amount ?? "") +
+    (p.items ?? "") +
+    (p.pwt ?? "");
 
   return crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
     .update(hashString)
-    .digest("base64");
+    .digest("hex"); // ✅ FIXED
 };
 
-/**
- * Perform purchase using a saved card token (PWT)
- */
-export const purchaseByToken = async (params: {
-  tran_id: string;
-  amount: string | number;
-  items: any[];
-  pwt: string;
-  firstname: string;
-  lastname: string;
-  email: string;
-  return_param?: string;
-}) => {
-  const dt = new Date();
-  const req_time =
-    dt.getFullYear().toString() +
-    (dt.getMonth() + 1).toString().padStart(2, "0") +
-    dt.getDate().toString().padStart(2, "0") +
-    dt.getHours().toString().padStart(2, "0") +
-    dt.getMinutes().toString().padStart(2, "0") +
-    dt.getSeconds().toString().padStart(2, "0");
-
-  const items = Buffer.from(JSON.stringify(params.items)).toString("base64");
+// ================= PURCHASE BY TOKEN =================
+export const purchaseByToken = async (params: any) => {
+  const itemsBase64 = Buffer.from(
+    JSON.stringify(params.items)
+  ).toString("base64");
 
   const payload: any = {
-    req_time,
+    req_time: getReqTime(),
     merchant_id: ABA_PAYWAY_MERCHANT_ID,
     tran_id: params.tran_id.toString(),
-    amount: parseFloat(params.amount.toString()).toFixed(2).toString(),
-    items,
+    amount: parseFloat(params.amount).toFixed(2),
+    items: itemsBase64,
     pwt: params.pwt,
     firstname: params.firstname,
     lastname: params.lastname,
     email: params.email,
-    return_param: (params.return_param || "").toString(),
+    return_param: params.return_param || "",
   };
 
   payload.hash = generateTokenHash(payload);
 
-  const response = await axios.post(ABA_PAYWAY_TOKEN_URL, payload, {
+  const res = await axios.post(ABA_PAYWAY_TOKEN_URL, payload, {
     headers: { "Content-Type": "application/json" },
   });
 
-  return response.data;
+  return res.data;
 };
 
-// Export private key for any signing operations if needed
-export { ABA_PAYWAY_PRIVATE_KEY };
+// ================= CHECK TRANSACTION =================
+export const checkAbaTransaction = async (tran_id: string) => {
+  const req_time = getReqTime();
+
+  const hashString = req_time + ABA_PAYWAY_MERCHANT_ID + tran_id;
+
+  const hash = crypto
+    .createHmac("sha512", ABA_PAYWAY_API_KEY)
+    .update(hashString)
+    .digest("hex"); // ✅ FIXED
+
+  const form = new URLSearchParams();
+  form.append("req_time", req_time);
+  form.append("merchant_id", ABA_PAYWAY_MERCHANT_ID);
+  form.append("tran_id", tran_id);
+  form.append("hash", hash);
+
+  const res = await fetch(ABA_PAYWAY_CHECK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
+  });
+
+  if (!res.ok) throw new Error("ABA check failed");
+
+  return res.json();
+};
+
+// ================= WEBHOOK VERIFY =================
+export const verifyWebhookSignature = (
+  payload: any,
+  received: string
+) => {
+  const keys = Object.keys(payload).sort();
+
+  let str = "";
+  for (const k of keys) {
+    str += (payload[k] ?? "").toString();
+  }
+
+  const expected = crypto
+    .createHmac("sha512", ABA_PAYWAY_API_KEY)
+    .update(str)
+    .digest("hex"); // ✅ FIXED
+
+  return expected === received;
+};
