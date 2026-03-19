@@ -25,39 +25,25 @@ const ABA_PAYWAY_PRIVATE_KEY = process.env.ABA_RSA_PRIVATE_KEY || "";
  * Generate HMAC-SHA512 hash for ABA PayWay checkout payload
  */
 export const generatePwHash = (payload: any): string => {
-  const hashString =
-    (payload.req_time || "") +
-    (payload.merchant_id || "") +
-    (payload.tran_id || "") +
-    (payload.amount || "") +
-    (payload.items || "") +
-    (payload.shipping || "") +
-    (payload.firstname || "") +
-    (payload.lastname || "") +
-    (payload.email || "") +
-    (payload.phone || "") +
-    (payload.type || "") +
-    (payload.payment_option || "") +
-    (payload.return_url || "") +
-    (payload.cancel_url || "") +
-    (payload.continue_success_url || "") +
-    (payload.return_deeplink || "") +
-    (payload.currency || "") +
-    (payload.custom_fields || "") +
-    (payload.return_params || "") +
-    (payload.payout || "") +
-    (payload.lifetime || "") +
-    (payload.additional_params || "") +
-    (payload.google_pay_token || "") +
-    (payload.skip_success_page || "");
+  // Sort fields by key (ascending)
+  const keys = Object.keys(payload).sort();
 
-  // Re-write to use a temp variable for logging
+  // Concatenate all values except 'hash'
+  let hashString = "";
+  for (const key of keys) {
+    if (key === "hash") continue;
+    const value = payload[key];
+    if (value !== undefined && value !== null) {
+      hashString += value.toString();
+    }
+  }
+
   const result = crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
     .update(hashString)
     .digest("base64");
 
-  console.log(`[ABA] Final Hash String: "${hashString}"`);
+  console.log(`[ABA] Final Hash String (Sorted): "${hashString}"`);
   console.log(`[ABA] Generated Hash: ${result}`);
 
   return result;
