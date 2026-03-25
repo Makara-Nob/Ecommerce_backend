@@ -18,6 +18,8 @@ export interface IUser extends Document<string>, IUserMethods {
     status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
     userPermission: 'APPROVED' | 'PENDING' | 'REJECTED' | 'NORMAL';
     roles: ('ADMIN' | 'STAFF' | 'CUSTOMER')[];
+    otp?: string;
+    otpExpiresAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -74,7 +76,15 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods>({
     roles: [{
         type: String,
         enum: ['ADMIN', 'STAFF', 'CUSTOMER']
-    }]
+    }],
+    otp: {
+        type: String,
+        default: null
+    },
+    otpExpiresAt: {
+        type: Date,
+        default: null
+    }
 }, {
     timestamps: true
 });
