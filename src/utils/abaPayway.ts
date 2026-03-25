@@ -93,8 +93,8 @@ export const getCheckoutPayload = (orderInfo: any) => {
     return_url: process.env.ABA_RETURN_URL || "",
     continue_success_url: process.env.ABA_SUCCESS_URL || "",
     cancel_url: process.env.ABA_CANCEL_URL || "",
-    return_deeplink: orderInfo.return_deeplink 
-      ? Buffer.from(orderInfo.return_deeplink).toString("base64") 
+    return_deeplink: orderInfo.return_deeplink
+      ? Buffer.from(orderInfo.return_deeplink).toString("base64")
       : "",
     custom_fields: orderInfo.custom_fields || "",
     return_params: orderInfo.return_params || "",
@@ -116,8 +116,9 @@ export const generateCofHash = (p: any): string => {
   const hashString =
     (p.merchant_id ?? "") +
     (p.ctid ?? "") +
-    (p.return_param ?? "") +
-    (p.return_url ?? "");
+    (p.return_param ?? "");
+
+  console.log("[ABA COF] HASH STRING:", hashString);
 
   return crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
@@ -127,9 +128,13 @@ export const generateCofHash = (p: any): string => {
 
 // ================= COF PAYLOAD =================
 export const getCofPayload = (info: any) => {
+  // CTID max length is 20 chars, must be unique per user.
+  // We hash the userId (info.ctid) to ensure it is purely alphanumeric and fits the length.
+  const hashId = crypto.createHash("md5").update(String(info.ctid)).digest("hex").slice(0, 16);
+
   const payload = {
     merchant_id: ABA_PAYWAY_MERCHANT_ID,
-    ctid: `user${info.ctid}`,
+    ctid: hashId,
     return_param: info.return_param || "",
     firstname: info.firstname || "",
     lastname: info.lastname || "",

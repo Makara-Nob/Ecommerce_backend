@@ -293,4 +293,54 @@ export default function (appRouter: Router) {
             appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
         }
     });
+
+    // @desc    Get saved cards for current user
+    // @route   GET /api/v1/users/saved-cards
+    // @access  Private
+    appRouter.get("/api/v1/users/saved-cards", async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+            const userId = await protect(req, res, appRouter);
+            if (!userId) return;
+
+            const user = await User.findById(userId).select('savedCards');
+            if (!user) return appRouter.sendResponse(res, 404, { message: "User not found" });
+
+            // Return masked data only (never expose pwt in listing)
+            const cards = (user.savedCards || []).map((c: any, i: number) => ({
+                index: i,
+                maskPan: c.maskPan,
+                cardType: c.cardType,
+                ctid: c.ctid,
+            }));
+
+            appRouter.sendResponse(res, 200, { savedCards: cards });
+        } catch (e: any) {
+            appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
+        }
+    });
+
+    // @desc    Delete a saved card by index
+    // @route   DELETE /api/v1/users/saved-cards/:index
+    // @access  Private
+    appRouter.delete("/api/v1/users/saved-cards/:index", async (req: IncomingMessage & { params?: any }, res: ServerResponse) => {
+        try {
+            const userId = await protect(req, res, appRouter);
+            if (!userId) return;
+
+            const idx = parseInt(req.params.index, 10);
+            const user = await User.findById(userId);
+            if (!user) return appRouter.sendResponse(res, 404, { message: "User not found" });
+
+            if (isNaN(idx) || idx < 0 || idx >= user.savedCards.length) {
+                return appRouter.sendResponse(res, 400, { message: "Invalid card index" });
+            }
+
+            user.savedCards.splice(idx, 1);
+            await user.save();
+
+            appRouter.sendResponse(res, 200, { message: "Card removed" });
+        } catch (e: any) {
+            appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
+        }
+    });
 }
