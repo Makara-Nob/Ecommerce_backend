@@ -6,6 +6,13 @@ export interface IUserMethods {
     matchPassword(enteredPassword: string): Promise<boolean>;
 }
 
+export interface ISavedCard {
+    pwt: string;
+    maskPan: string;
+    cardType: string;
+    ctid: string;
+}
+
 export interface IUser extends Document<string>, IUserMethods {
     id: number;
     username: string;
@@ -20,6 +27,7 @@ export interface IUser extends Document<string>, IUserMethods {
     roles: ('ADMIN' | 'STAFF' | 'CUSTOMER')[];
     otp?: string;
     otpExpiresAt?: Date;
+    savedCards: ISavedCard[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -84,7 +92,13 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods>({
     otpExpiresAt: {
         type: Date,
         default: null
-    }
+    },
+    savedCards: [{
+        pwt: { type: String, required: true },
+        maskPan: { type: String, required: true },
+        cardType: { type: String, required: true },
+        ctid: { type: String, required: true },
+    }]
 }, {
     timestamps: true
 });
