@@ -16,6 +16,7 @@ import {
   ABA_PAYWAY_COF_URL,
 } from "../utils/abaPayway";
 import User from "../models/User";
+import { getCurrentPrice } from "../utils/promotionUtils";
 
 export default function (appRouter: Router) {
   // @desc    Create new order from cart
@@ -98,15 +99,18 @@ export default function (appRouter: Router) {
           // Defer stock deduction until payment is confirmed via webhook.
           // Product quantity will only be reduced in /api/v1/orders/payway-webhook or token pay.
 
+          // Re-verify price at checkout time
+          const currentPrice = await getCurrentPrice(product);
+          
           // Add to order items
           orderItems.push({
             product: product.id,
             quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            subTotal: item.subTotal,
+            unitPrice: currentPrice,
+            subTotal: item.quantity * currentPrice,
           });
 
-          totalAmount += item.subTotal;
+          totalAmount += (item.quantity * currentPrice);
         }
 
         // 3. Create the order
@@ -221,10 +225,34 @@ export default function (appRouter: Router) {
           .populate({
             path: "items.product",
             model: "Product",
-            select: "id name sku imageUrl",
+            select: "_id name sku description sellingPrice costPrice qty quantity minStock status viewCount imageUrl images variants category brand supplier",
+            populate: [
+              { path: 'category', select: '_id name description' },
+              { path: 'brand', select: '_id name description logoUrl' }
+            ]
           });
 
-        appRouter.sendResponse(res, 200, orders);
+        const mappedOrders = orders.map(order => {
+          const oObj = order.toObject();
+          return {
+            ...oObj,
+            id: oObj._id,
+            items: oObj.items.map((item: any) => ({
+              ...item,
+              id: item._id,
+              product: item.product ? {
+                ...item.product,
+                id: item.product._id,
+                category: item.product.category ? { ...item.product.category, id: item.product.category._id } : null,
+                brand: item.product.brand ? { ...item.product.brand, id: item.product.brand._id } : null,
+                supplier: item.product.supplier ? { ...item.product.supplier, id: item.product.supplier._id } : null,
+                variants: item.product.variants ? item.product.variants.map((v: any) => ({ ...v, id: v._id })) : []
+              } : null
+            }))
+          };
+        });
+
+        appRouter.sendResponse(res, 200, mappedOrders);
       } catch (e) {
         appRouter.sendResponse(res, 500, { message: "Server Error" });
       }
@@ -270,7 +298,11 @@ export default function (appRouter: Router) {
         const order = await Order.findById(req.params.id).populate({
           path: "items.product",
           model: "Product",
-          select: "id name sku imageUrl price sellingPrice",
+          select: "_id name sku description sellingPrice costPrice qty quantity minStock status viewCount imageUrl images variants category brand supplier",
+          populate: [
+            { path: 'category', select: '_id name description' },
+            { path: 'brand', select: '_id name description logoUrl' }
+          ]
         });
 
         if (order) {
@@ -280,7 +312,24 @@ export default function (appRouter: Router) {
               message: "Not authorized to view this order",
             });
           }
-          appRouter.sendResponse(res, 200, order);
+          const oObj = order.toObject();
+          const mappedOrder = {
+            ...oObj,
+            id: oObj._id,
+            items: oObj.items.map((item: any) => ({
+              ...item,
+              id: item._id,
+              product: item.product ? {
+                ...item.product,
+                id: item.product._id,
+                category: item.product.category ? { ...item.product.category, id: item.product.category._id } : null,
+                brand: item.product.brand ? { ...item.product.brand, id: item.product.brand._id } : null,
+                supplier: item.product.supplier ? { ...item.product.supplier, id: item.product.supplier._id } : null,
+                variants: item.product.variants ? item.product.variants.map((v: any) => ({ ...v, id: v._id })) : []
+              } : null
+            }))
+          };
+          appRouter.sendResponse(res, 200, mappedOrder);
         } else {
           appRouter.sendResponse(res, 404, { message: "Order not found" });
         }
@@ -327,7 +376,7 @@ export default function (appRouter: Router) {
         if (!userId) return;
 
         const { paymentOption } = await appRouter.parseJsonBody(req);
-        
+
         const order = await Order.findById(req.params.id);
         if (!order) {
           return appRouter.sendResponse(res, 404, { message: "Order not found" });
@@ -577,8 +626,8 @@ export default function (appRouter: Router) {
           for (const item of order.items) {
             const product = await Product.findById(item.product);
             if (product) {
-               product.quantity -= item.quantity;
-               await product.save();
+              product.quantity -= item.quantity;
+              await product.save();
             }
           }
 
@@ -612,153 +661,153 @@ export default function (appRouter: Router) {
    *       200:
    *         description: Webhook processed
    */
-    appRouter.post(
-      "/api/v1/orders/payway-webhook",
-      async (req: IncomingMessage, res: ServerResponse) => {
-        try {
-          const payload = await appRouter.parseJsonBody(req);
-          const signature = req.headers["x-payway-hmac-sha512"] as string;
+  appRouter.post(
+    "/api/v1/orders/payway-webhook",
+    async (req: IncomingMessage, res: ServerResponse) => {
+      try {
+        const payload = await appRouter.parseJsonBody(req);
+        const signature = req.headers["x-payway-hmac-sha512"] as string;
 
-          if (!signature || !verifyWebhookSignature(payload, signature)) {
-            console.error("[ABA Webhook] Invalid signature or missing header");
-            return appRouter.sendResponse(res, 401, {
-              message: "Invalid signature",
-            });
-          }
+        if (!signature || !verifyWebhookSignature(payload, signature)) {
+          console.error("[ABA Webhook] Invalid signature or missing header");
+          return appRouter.sendResponse(res, 401, {
+            message: "Invalid signature",
+          });
+        }
 
-          const tran_id = payload.tran_id;
-          const status = payload.status; // 0 for success
+        const tran_id = payload.tran_id;
+        const status = payload.status; // 0 for success
 
-          console.log(
-            `[ABA Webhook] Received status ${status} for tran_id ${tran_id}`,
-          );
-          console.log(`[ABA Webhook] Raw Payload:`, JSON.stringify(payload, null, 2));
+        console.log(
+          `[ABA Webhook] Received status ${status} for tran_id ${tran_id}`,
+        );
+        console.log(`[ABA Webhook] Raw Payload:`, JSON.stringify(payload, null, 2));
 
-          if (tran_id) {
-            // Check if this is a Link Card (COF) callback by looking for pwt
-            const returnParams = payload.return_params;
-            const pwt = returnParams?.card_status?.pwt;
-            
-            if (pwt) {
-              // Option #1: Link Card (COF) Flow
-              const returnParamStr = String(returnParams.return_param || "");
-              let orderUser: any = null;
-              let order: any = null;
+        if (tran_id) {
+          // Check if this is a Link Card (COF) callback by looking for pwt
+          const returnParams = payload.return_params;
+          const pwt = returnParams?.card_status?.pwt;
 
-              if (returnParamStr.startsWith("link_card_")) {
-                // Standalone link card from Profile screen
-                const linkUserId = returnParamStr.replace("link_card_", "");
-                orderUser = await User.findById(linkUserId);
-              } else {
-                // Link card during checkout
-                order = await Order.findById(returnParamStr);
-                if (order && order.status === "PENDING") {
-                  orderUser = await User.findById(order.userId);
-                }
-              }
+          if (pwt) {
+            // Option #1: Link Card (COF) Flow
+            const returnParamStr = String(returnParams.return_param || "");
+            let orderUser: any = null;
+            let order: any = null;
 
-              if (orderUser) {
-                console.log(`[ABA Webhook] Card linked for user ${orderUser._id}. Saving token...`);
-                const cardInfo = returnParams.card_status;
-                // Avoid duplicates by checking maskPan
-                const alreadySaved = orderUser.savedCards?.some((c: any) => c.maskPan === cardInfo.mask_pan);
-                if (!alreadySaved) {
-                  const hashId = crypto.createHash("md5").update(orderUser._id.toString()).digest("hex").slice(0, 16);
-                  orderUser.savedCards = orderUser.savedCards || [];
-                  orderUser.savedCards.push({
-                    pwt: cardInfo.pwt,
-                    maskPan: cardInfo.mask_pan,
-                    cardType: cardInfo.card_type,
-                    ctid: hashId,
-                  });
-                  await orderUser.save();
-                  console.log(`[ABA Webhook] Card saved for user ${orderUser._id}: ${cardInfo.mask_pan}`);
-                }
-
-                // If this was linked during checkout, charge the order immediately
-                if (order) {
-                  try {
-                    const hashId = crypto.createHash("md5").update(orderUser._id.toString()).digest("hex").slice(0, 16);
-                    const purchaseResult = await purchaseByToken({
-                      tran_id: order.paywayTranId,
-                      amount: order.netAmount,
-                      items: order.items.map((i: any) => ({
-                        name: "Product",
-                        quantity: i.quantity,
-                        price: parseFloat(i.unitPrice).toFixed(2),
-                      })),
-                      pwt: cardInfo.pwt,
-                      ctid: hashId,
-                      firstname: orderUser?.fullName || "Customer",
-                      lastname: "",
-                      email: orderUser?.email || "",
-                      return_param: String(order.id),
-                    });
-
-                    if (purchaseResult?.payment_status?.status === "0") {
-                      order.status = "CONFIRMED";
-                      order.paywayStatus = "APPROVED";
-                      
-                      // Deduct stock upon successful payment
-                      for (const item of order.items) {
-                        const product = await Product.findById(item.product);
-                        if (product) {
-                           product.quantity -= item.quantity;
-                           await product.save();
-                        }
-                      }
-                      
-                      await order.save();
-                    } else {
-                      order.status = "CANCELLED";
-                      order.paywayStatus = `TOKEN_PAY_FAILED_${purchaseResult?.payment_status?.code}`;
-                      await order.save();
-                    }
-                  } catch (tokenErr) {
-                    console.error("[ABA Webhook] purchaseByToken Error:", tokenErr);
-                  }
-                }
-              }
+            if (returnParamStr.startsWith("link_card_")) {
+              // Standalone link card from Profile screen
+              const linkUserId = returnParamStr.replace("link_card_", "");
+              orderUser = await User.findById(linkUserId);
             } else {
-              // OPTION #2: Standard Purchase callback
-              const order = await Order.findOne({ paywayTranId: tran_id });
+              // Link card during checkout
+              order = await Order.findById(returnParamStr);
+              if (order && order.status === "PENDING") {
+                orderUser = await User.findById(order.userId);
+              }
+            }
+
+            if (orderUser) {
+              console.log(`[ABA Webhook] Card linked for user ${orderUser._id}. Saving token...`);
+              const cardInfo = returnParams.card_status;
+              // Avoid duplicates by checking maskPan
+              const alreadySaved = orderUser.savedCards?.some((c: any) => c.maskPan === cardInfo.mask_pan);
+              if (!alreadySaved) {
+                const hashId = crypto.createHash("md5").update(orderUser._id.toString()).digest("hex").slice(0, 16);
+                orderUser.savedCards = orderUser.savedCards || [];
+                orderUser.savedCards.push({
+                  pwt: cardInfo.pwt,
+                  maskPan: cardInfo.mask_pan,
+                  cardType: cardInfo.card_type,
+                  ctid: hashId,
+                });
+                await orderUser.save();
+                console.log(`[ABA Webhook] Card saved for user ${orderUser._id}: ${cardInfo.mask_pan}`);
+              }
+
+              // If this was linked during checkout, charge the order immediately
               if (order) {
-                if (status === "0" && order.status === "PENDING") {
-                  order.status = "CONFIRMED";
-                  order.paywayStatus = "APPROVED";
-                  
-                  // Deduct stock upon successful payment
-                  for (const item of order.items) {
-                    const product = await Product.findById(item.product);
-                    if (product) {
-                       product.quantity -= item.quantity;
-                       await product.save();
+                try {
+                  const hashId = crypto.createHash("md5").update(orderUser._id.toString()).digest("hex").slice(0, 16);
+                  const purchaseResult = await purchaseByToken({
+                    tran_id: order.paywayTranId,
+                    amount: order.netAmount,
+                    items: order.items.map((i: any) => ({
+                      name: "Product",
+                      quantity: i.quantity,
+                      price: parseFloat(i.unitPrice).toFixed(2),
+                    })),
+                    pwt: cardInfo.pwt,
+                    ctid: hashId,
+                    firstname: orderUser?.fullName || "Customer",
+                    lastname: "",
+                    email: orderUser?.email || "",
+                    return_param: String(order.id),
+                  });
+
+                  if (purchaseResult?.payment_status?.status === "0") {
+                    order.status = "CONFIRMED";
+                    order.paywayStatus = "APPROVED";
+
+                    // Deduct stock upon successful payment
+                    for (const item of order.items) {
+                      const product = await Product.findById(item.product);
+                      if (product) {
+                        product.quantity -= item.quantity;
+                        await product.save();
+                      }
                     }
+
+                    await order.save();
+                  } else {
+                    order.status = "CANCELLED";
+                    order.paywayStatus = `TOKEN_PAY_FAILED_${purchaseResult?.payment_status?.code}`;
+                    await order.save();
                   }
-                  
-                  await order.save();
-                } else if (status !== "0" && order.status === "PENDING") {
-                  order.status = "CANCELLED";
-                  order.paywayStatus = `DECLINED_${status}`;
-                  await order.save();
+                } catch (tokenErr) {
+                  console.error("[ABA Webhook] purchaseByToken Error:", tokenErr);
                 }
               }
             }
-          }
+          } else {
+            // OPTION #2: Standard Purchase callback
+            const order = await Order.findOne({ paywayTranId: tran_id });
+            if (order) {
+              if (status === "0" && order.status === "PENDING") {
+                order.status = "CONFIRMED";
+                order.paywayStatus = "APPROVED";
 
-          // Must respond HTTP 200 to acknowledge receipt to ABA
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ status: "success" }));
-        } catch (e: any) {
-          console.error("[ABA Webhook] Error:", e);
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(
-            JSON.stringify({
-              status: "error",
-              message: e.message || "Server Error",
-            }),
-          );
+                // Deduct stock upon successful payment
+                for (const item of order.items) {
+                  const product = await Product.findById(item.product);
+                  if (product) {
+                    product.quantity -= item.quantity;
+                    await product.save();
+                  }
+                }
+
+                await order.save();
+              } else if (status !== "0" && order.status === "PENDING") {
+                order.status = "CANCELLED";
+                order.paywayStatus = `DECLINED_${status}`;
+                await order.save();
+              }
+            }
+          }
         }
-      },
-    );
+
+        // Must respond HTTP 200 to acknowledge receipt to ABA
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "success" }));
+      } catch (e: any) {
+        console.error("[ABA Webhook] Error:", e);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            status: "error",
+            message: e.message || "Server Error",
+          }),
+        );
+      }
+    },
+  );
 }

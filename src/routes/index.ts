@@ -20,6 +20,7 @@ import reportController from '../controllers/reportController';
 
 import publicPromotionController from '../controllers/publicPromotionController';
 import publicBannerController from '../controllers/publicBannerController';
+import wishlistController from '../controllers/wishlistController';
 
 const appRouter = new Router();
 
@@ -31,6 +32,7 @@ orderController(appRouter);
 addressController(appRouter);
 publicPromotionController(appRouter);
 publicBannerController(appRouter);
+wishlistController(appRouter);
 
 // Admin Controllers import
 adminCategoryController(appRouter);

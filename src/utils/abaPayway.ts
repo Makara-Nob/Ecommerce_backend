@@ -140,7 +140,6 @@ export const getCofPayload = (info: any) => {
     lastname: info.lastname || "",
     email: info.email || "",
     phone: info.phone || "",
-    return_url: process.env.ABA_RETURN_URL || "",
     continue_add_card_success_url: process.env.ABA_SUCCESS_URL || "",
   };
 

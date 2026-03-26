@@ -23,12 +23,19 @@ export default function(appRouter: Router) {
                 startDate: { $lte: currentDate },
                 endDate: { $gte: currentDate }
             })
-            .populate('product', 'id name description sellingPrice costPrice variants imageUrl images sku category brand supplier')
-            .populate({ path: 'product', populate: [{ path: 'category', select: '_id name description' }, { path: 'brand', select: '_id name description logoUrl' }] })
+            .populate({
+                path: 'product',
+                select: '_id name description sellingPrice costPrice variants imageUrl images sku category brand supplier',
+                populate: [
+                    { path: 'category', select: '_id name description' },
+                    { path: 'brand', select: '_id name description logoUrl' }
+                ]
+            })
             .sort({ endDate: 1 });
 
             const mappedPromotions = promotions.map((p: any) => {
                 const pObj = p.toObject();
+                // When using populate with select, we must be careful with mapping
                 const product = pObj.product;
                 
                 return {

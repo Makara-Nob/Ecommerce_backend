@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": "ts",
+  "ignore": ["src/**/*.spec.ts", "node_modules", "dist", "*.ts", "*.txt"],
+  "exec": "ts-node server.ts"
+}

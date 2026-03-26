@@ -28,6 +28,7 @@ export interface IUser extends Document<string>, IUserMethods {
     otp?: string;
     otpExpiresAt?: Date;
     savedCards: ISavedCard[];
+    wishlist: number[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -98,6 +99,10 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods>({
         maskPan: { type: String, required: true },
         cardType: { type: String, required: true },
         ctid: { type: String, required: true },
+    }],
+    wishlist: [{
+        type: Number,
+        ref: 'Product'
     }]
 }, {
     timestamps: true

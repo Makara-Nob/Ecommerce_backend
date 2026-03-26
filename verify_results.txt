@@ -1,0 +1,58 @@
+﻿Found 8 active promotions
+
+Promotion: Summer Tech Sale
+  Product: MacBook Pro M2
+  Selling Price: 1999
+  Description: PRESENT
+  _id: 1
+  category: POPULATED
+---
+Promotion: Galaxy Upgrade Promo
+  Product: Samsung Galaxy S24 Ultra
+  Selling Price: 1299
+  Description: PRESENT
+  _id: 4
+  category: POPULATED
+---
+Promotion: Summer Clearance
+  Product: Nike Air Max 270
+  Selling Price: 120
+  Description: PRESENT
+  _id: 12
+  category: POPULATED
+---
+Promotion: Gym Starter Deal
+  Product: Adjustable Dumbbell Set (5ΓÇô52.5 lbs)
+  Selling Price: 399
+  Description: PRESENT
+  _id: 26
+  category: POPULATED
+---
+Promotion: Coffee Lover Deal
+  Product: Nescaf├⌐ Gold Blend Coffee (500g)
+  Selling Price: 16
+  Description: PRESENT
+  _id: 36
+  category: POPULATED
+---
+Promotion: Toy Box Bonanza
+  Product: LEGO Architecture Skyline ΓÇô Paris
+  Selling Price: 79
+  Description: PRESENT
+  _id: 39
+  category: POPULATED
+---
+Promotion: Beauty Glow Package
+  Product: Hydrating Vitamin C Serum
+  Selling Price: 45
+  Description: PRESENT
+  _id: 31
+  category: POPULATED
+---
+Promotion: Home Refresh Sale
+  Product: Modern Velvet Sofa
+  Selling Price: 599
+  Description: PRESENT
+  _id: 19
+  category: POPULATED
+---

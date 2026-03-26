@@ -3,6 +3,7 @@ import { Product } from "../models/Product";
 import { protect } from "../utils/authPlugin";
 import { Router } from "../utils/Router";
 import { IncomingMessage, ServerResponse } from "http";
+import { getCurrentPrice } from "../utils/promotionUtils";
 
 export default function (appRouter: Router) {
   // Helper to get or create active cart
@@ -142,18 +143,21 @@ export default function (appRouter: Router) {
         });
 
         if (cartItem) {
-          // Update existing item
+          // Update existing item - Recalculate price just in case it changed
+          const currentPrice = await getCurrentPrice(product);
+          cartItem.unitPrice = currentPrice;
           cartItem.quantity += quantity;
           cartItem.subTotal = cartItem.quantity * cartItem.unitPrice;
           await cartItem.save();
         } else {
           // Create new item
+          const currentPrice = await getCurrentPrice(product);
           cartItem = await CartItem.create({
             cartId: cart.id,
             product: product.id,
             quantity,
-            unitPrice: product.sellingPrice,
-            subTotal: quantity * product.sellingPrice,
+            unitPrice: currentPrice,
+            subTotal: quantity * currentPrice,
           });
           cart.items.push(cartItem._id as unknown as number);
           await cart.save();
@@ -260,6 +264,8 @@ export default function (appRouter: Router) {
           });
         }
 
+        const currentPrice = await getCurrentPrice(product);
+        cartItem.unitPrice = currentPrice;
         cartItem.quantity = quantity;
         cartItem.subTotal = quantity * cartItem.unitPrice;
         await cartItem.save();
