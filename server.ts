@@ -1,32 +1,37 @@
 import 'dotenv/config';
-import http, { IncomingMessage, ServerResponse } from 'http';
+import express, { Request, Response } from 'express';
+import cors from 'cors';
 import connectDB from './src/config/db';
 import AppRouter from './src/routes/index';
+import path from 'path';
 
 // Connect to Database
 connectDB();
 
 const PORT = process.env.PORT || 5000;
 
-const server = http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    // Basic CORS handler for Preflight OPTIONS
-    if (req.method === 'OPTIONS') {
-        res.writeHead(204, {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-        });
-        res.end();
-        return;
+const app = express();
+
+// Standard express middleware for REST APIs
+app.use(cors());
+
+// Parse JSON bodies (with a rawBody fallback for webhook verification just in case)
+app.use(express.json({
+    verify: (req: any, res, buf) => {
+        req.rawBody = buf;
     }
+}));
+app.use(express.urlencoded({ extended: true }));
 
-    // Handle all other routing
-    await AppRouter.handle(req, res);
-});
+// Serve static files from uploads folder
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-server.listen(PORT, () => {
+// Mount the converted AppRouter logic
+app.use('/', AppRouter.expressRouter);
+
+app.listen(PORT, () => {
     const host = 'http://localhost';
-    console.log(`\n🚀 Server is running in ${process.env.NODE_ENV || 'development'} mode`);
+    console.log(`\n🚀 Server is running in ${process.env.NODE_ENV || 'development'} mode (Express Engine!)`);
     console.log(`🌐 API        : ${host}:${PORT}`);
     console.log(`📚 Swagger UI : ${host}:${PORT}/api-docs\n`);
 });

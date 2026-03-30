@@ -21,6 +21,9 @@ import reportController from '../controllers/reportController';
 import publicPromotionController from '../controllers/publicPromotionController';
 import publicBannerController from '../controllers/publicBannerController';
 import wishlistController from '../controllers/wishlistController';
+import tokenController from '../controllers/tokenController';
+import notificationController from '../controllers/notificationController';
+import reviewController from '../controllers/reviewController';
 
 const appRouter = new Router();
 
@@ -33,6 +36,9 @@ addressController(appRouter);
 publicPromotionController(appRouter);
 publicBannerController(appRouter);
 wishlistController(appRouter);
+tokenController(appRouter);
+notificationController(appRouter);
+reviewController(appRouter);
 
 // Admin Controllers import
 adminCategoryController(appRouter);

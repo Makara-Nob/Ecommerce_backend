@@ -116,6 +116,9 @@ export default function (appRouter: Router) {
         const body = await appRouter.parseJsonBody(req);
         const productId = Number(body.productId);
         const quantity = Number(body.quantity);
+        // ➕ NEW — read variantId so we can add additionalPrice
+        const variantId = body.variantId ? Number(body.variantId) : undefined;
+
         if (!productId || !quantity) {
           return appRouter.sendResponse(res, 400, {
             message: "Product ID and quantity are required",
@@ -136,28 +139,46 @@ export default function (appRouter: Router) {
           });
         }
 
+        // ➕ NEW — Find variant and add its additionalPrice to the base price
+        let variantName: string | undefined;
+        let additionalPrice = 0;
+        if (variantId !== undefined) {
+          const variant = product.variants.find((v: any) => Number(v._id) === variantId);
+          if (variant) {
+            additionalPrice = variant.additionalPrice || 0;
+            const parts = [variant.variantName, ...(variant.optionValues || [])].filter(Boolean);
+            variantName = parts.join(' / ') || `Variant #${variantId}`;
+          }
+        }
+
         let cart = await getActiveCart(userId);
         let cartItem = await CartItem.findOne({
           cartId: cart.id,
           product: product.id,
+          // ➕ NEW — Separate cart items per variant so each gets its own price
+          variantId: variantId ?? null,
         });
 
         if (cartItem) {
           // Update existing item - Recalculate price just in case it changed
-          const currentPrice = await getCurrentPrice(product);
+          const basePrice = await getCurrentPrice(product);
+          const currentPrice = basePrice + additionalPrice; // ➕ NEW
           cartItem.unitPrice = currentPrice;
           cartItem.quantity += quantity;
           cartItem.subTotal = cartItem.quantity * cartItem.unitPrice;
           await cartItem.save();
         } else {
           // Create new item
-          const currentPrice = await getCurrentPrice(product);
+          const basePrice = await getCurrentPrice(product);
+          const currentPrice = basePrice + additionalPrice; // ➕ NEW
           cartItem = await CartItem.create({
             cartId: cart.id,
             product: product.id,
             quantity,
             unitPrice: currentPrice,
             subTotal: quantity * currentPrice,
+            variantId,       // ➕ NEW
+            variantName,     // ➕ NEW
           });
           cart.items.push(cartItem._id as unknown as number);
           await cart.save();
@@ -264,8 +285,14 @@ export default function (appRouter: Router) {
           });
         }
 
-        const currentPrice = await getCurrentPrice(product);
-        cartItem.unitPrice = currentPrice;
+        let additionalPrice = 0;
+        if (cartItem.variantId != null) {
+          const variant = product.variants.find((v: any) => Number(v._id) === cartItem.variantId);
+          if (variant) additionalPrice = variant.additionalPrice || 0;
+        }
+
+        const basePrice = await getCurrentPrice(product);
+        cartItem.unitPrice = basePrice + additionalPrice;
         cartItem.quantity = quantity;
         cartItem.subTotal = quantity * cartItem.unitPrice;
         await cartItem.save();

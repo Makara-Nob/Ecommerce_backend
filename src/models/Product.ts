@@ -60,8 +60,7 @@ export interface IProductVariant extends Document<number> {
     id: number;
     variantName?: string;
     sku?: string;
-    size?: string;
-    color?: string;
+    optionValues: string[];
     stockQuantity: number;
     additionalPrice: number;
     imageUrl?: string;
@@ -72,14 +71,23 @@ const productVariantSchema = new Schema<IProductVariant>({
     _id: Number,
     variantName: String,
     sku: { type: String, unique: true, sparse: true },
-    size: String,
-    color: String,
+    optionValues: { type: [String], default: [] },
     stockQuantity: { type: Number, default: 0 },
     additionalPrice: { type: Number, default: 0 },
     imageUrl: String,
     status: { type: String, default: 'ACTIVE' }
 }, { timestamps: true });
 productVariantSchema.plugin(autoIncrementPlugin, { modelName: 'ProductVariant', field: '_id' });
+
+export interface IProductOption {
+    name: string;
+    values: string[];
+}
+
+const productOptionSchema = new Schema<IProductOption>({
+    name: { type: String, required: true },
+    values: { type: [String], required: true }
+}, { _id: false });
 
 export interface IProduct extends Document<number> {
     id: number;
@@ -97,6 +105,7 @@ export interface IProduct extends Document<number> {
     viewCount: number;
     imageUrl?: string;
     images: string[];
+    options: IProductOption[];
     variants: IProductVariant[];
 }
 
@@ -116,6 +125,7 @@ const productSchema = new Schema<IProduct>({
     viewCount: { type: Number, default: 0 },
     imageUrl: String,
     images: { type: [String], default: [] },
+    options: [productOptionSchema],
     variants: [productVariantSchema]
 }, { timestamps: true });
 productSchema.plugin(autoIncrementPlugin, { modelName: 'Product', field: '_id' });

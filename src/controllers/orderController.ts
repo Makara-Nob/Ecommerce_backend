@@ -17,6 +17,7 @@ import {
 } from "../utils/abaPayway";
 import User from "../models/User";
 import { getCurrentPrice } from "../utils/promotionUtils";
+import { sendPushNotification } from "../utils/fcmService";
 
 export default function (appRouter: Router) {
   // @desc    Create new order from cart
@@ -61,7 +62,7 @@ export default function (appRouter: Router) {
         const userId = await protect(req, res, appRouter);
         if (!userId) return;
 
-        const { shippingAddress, paymentMethod, note } =
+        const { shippingAddress, paymentMethod, note, items: directItems, isBuyNow } =
           await appRouter.parseJsonBody(req);
 
         if (!shippingAddress) {
@@ -70,47 +71,71 @@ export default function (appRouter: Router) {
           });
         }
 
-        // 1. Get active cart
-        const cart = await Cart.findOne({ userId, status: "ACTIVE" }).populate(
-          "items",
-        );
+        let totalAmount = 0;
+        const orderItems = [];
+        let usedCart = false;
+        let cartToClear = null;
 
-        if (!cart || cart.items.length === 0) {
-          return appRouter.sendResponse(res, 400, { message: "Cart is empty" });
+        let itemsToProcess = directItems;
+        if (!isBuyNow || !itemsToProcess || itemsToProcess.length === 0) {
+          // fallback to cart
+          const cart = await Cart.findOne({ userId, status: "ACTIVE" }).populate("items");
+          if (!cart || cart.items.length === 0) {
+            return appRouter.sendResponse(res, 400, { message: "Cart is empty" });
+          }
+          itemsToProcess = cart.items;
+          usedCart = true;
+          cartToClear = cart;
         }
 
         // 2. Validate stock and calculate final amounts
-        let totalAmount = 0;
-        const orderItems = [];
-
-        for (let cartItemId of cart.items) {
-          // Need to refetch in case items property contains plain ObjectIds instead of populated objects
-          const item = await CartItem.findById(cartItemId);
-          if (!item) continue;
-
-          const product = await Product.findById(item.product);
-
-          if (!product || product.quantity < item.quantity) {
-            return appRouter.sendResponse(res, 400, {
-              message: `Product ${product ? product.name : item.product} is out of stock or requested quantity exceeds available stock.`,
-            });
+        for (let rawItem of itemsToProcess) {
+          let productId, quantity, variantId, unitPrice, variantName;
+            
+          if (usedCart) {
+              productId = rawItem.product;
+              quantity = rawItem.quantity;
+              unitPrice = rawItem.unitPrice;
+              variantId = rawItem.variantId;
+              variantName = rawItem.variantName;
+          } else {
+              productId = rawItem.productId;
+              quantity = rawItem.quantity;
+              variantId = rawItem.variantId;
           }
 
-          // Defer stock deduction until payment is confirmed via webhook.
-          // Product quantity will only be reduced in /api/v1/orders/payway-webhook or token pay.
+          const product = await Product.findById(productId);
+          if (!product || product.quantity < quantity) {
+              return appRouter.sendResponse(res, 400, {
+                  message: `Product ${product ? product.name : productId} is out of stock.`,
+              });
+          }
 
-          // Re-verify price at checkout time
-          const currentPrice = await getCurrentPrice(product);
-          
-          // Add to order items
+          if (!usedCart) {
+              let additionalPrice = 0;
+              if (variantId != null) {
+                  const variant = product.variants.find((v: any) => Number(v._id) === Number(variantId));
+                  if (variant) {
+                      additionalPrice = variant.additionalPrice || 0;
+                      const parts = [variant.variantName, ...(variant.optionValues || [])].filter(Boolean);
+                      variantName = parts.join(' / ') || `Variant #${variantId}`;
+                  }
+              }
+              unitPrice = (await getCurrentPrice(product)) + additionalPrice;
+          } else if (!unitPrice || unitPrice <= 0) {
+              unitPrice = await getCurrentPrice(product);
+          }
+
           orderItems.push({
             product: product.id,
-            quantity: item.quantity,
-            unitPrice: currentPrice,
-            subTotal: item.quantity * currentPrice,
+            quantity: quantity,
+            unitPrice: unitPrice,
+            subTotal: quantity * unitPrice,
+            ...(variantId != null && { variantId }),
+            ...(variantName && { variantName }),
           });
 
-          totalAmount += (item.quantity * currentPrice);
+          totalAmount += quantity * unitPrice;
         }
 
         // 3. Create the order
@@ -143,12 +168,20 @@ export default function (appRouter: Router) {
           ...(paywayTranId && { paywayTranId }),
         });
 
-        // 4. Clear the cart
-        cart.status = "CHECKED_OUT";
-        await cart.save();
+        // --- PUSH NOTIFICATION: ORDER PLACED ---
+        await sendPushNotification(
+          userId,
+          "Order Placed!",
+          `Your order #${order.id} has been placed successfully.`
+        );
+        // ---------------------------------------
 
-        // Also clear cart items to keep DB clean
-        await CartItem.deleteMany({ cartId: cart.id });
+        // 4. Clear the cart if used
+        if (usedCart && cartToClear) {
+            cartToClear.status = "CHECKED_OUT";
+            await cartToClear.save();
+            await CartItem.deleteMany({ cartId: cartToClear.id });
+        }
 
         let responseData: any = order.toObject ? order.toObject() : order;
 
@@ -195,32 +228,62 @@ export default function (appRouter: Router) {
     },
   );
 
-  // @desc    Get logged in user orders
-  // @route   GET /api/v1/orders/my-orders
+  // @desc    Get logged in user orders with pagination
+  // @route   POST /api/v1/orders/my-orders
   // @access  Private
   /**
    * @swagger
    * /api/v1/orders/my-orders:
-   *   get:
-   *     summary: Get logged in user orders
+   *   post:
+   *     summary: Get logged in user orders with pagination
    *     tags: [Orders]
    *     security:
    *       - bearerAuth: []
-   *     description: Retrieve all orders for the currently logged in user
+   *     description: Retrieve orders for the currently logged in user with pagination
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               pageNo:
+   *                 type: number
+   *                 default: 1
+   *               pageSize:
+   *                 type: number
+   *                 default: 10
    *     responses:
    *       200:
-   *         description: List of orders
+   *         description: Paginated list of orders
    *       401:
    *         description: Not authorized
    */
-  appRouter.get(
+  appRouter.post(
     "/api/v1/orders/my-orders",
     async (req: IncomingMessage, res: ServerResponse) => {
       try {
         const userId = await protect(req, res, appRouter);
         if (!userId) return;
 
-        const orders = await Order.find({ userId })
+        const body = await appRouter.parseJsonBody(req);
+        const page = parseInt(body.pageNo) || 1;
+        const limit = parseInt(body.pageSize) || 10;
+        const skip = (page - 1) * limit;
+
+        // Support status filtering
+        const filter: any = { userId };
+        if (body.status === 'PAID') {
+          filter.status = { $in: ['CONFIRMED', 'SHIPPED', 'DELIVERED'] };
+        } else if (body.status && body.status !== 'ALL') {
+          filter.status = body.status;
+        } else {
+          // Default: exclude PENDING (payment in progress) orders
+          filter.status = { $nin: ['PENDING'] };
+        }
+        const totalElements = await Order.countDocuments(filter);
+        const totalPages = Math.ceil(totalElements / limit);
+
+        const orders = await Order.find(filter)
           .sort("-createdAt")
           .populate({
             path: "items.product",
@@ -230,7 +293,9 @@ export default function (appRouter: Router) {
               { path: 'category', select: '_id name description' },
               { path: 'brand', select: '_id name description logoUrl' }
             ]
-          });
+          })
+          .skip(skip)
+          .limit(limit);
 
         const mappedOrders = orders.map(order => {
           const oObj = order.toObject();
@@ -252,8 +317,16 @@ export default function (appRouter: Router) {
           };
         });
 
-        appRouter.sendResponse(res, 200, mappedOrders);
+        appRouter.sendResponse(res, 200, {
+          content: mappedOrders,
+          totalElements,
+          totalPages,
+          pageNo: page,
+          pageSize: limit,
+          last: page >= totalPages
+        });
       } catch (e) {
+        console.error('My Orders Error:', e);
         appRouter.sendResponse(res, 500, { message: "Server Error" });
       }
     },
@@ -565,6 +638,53 @@ export default function (appRouter: Router) {
     }
   );
 
+  // @desc    Update order status
+  // @route   POST /api/v1/orders/:id/status
+  // @access  Private (Admin ideally, but using standard protect for now)
+  appRouter.post(
+    "/api/v1/orders/:id/status",
+    async (req: IncomingMessage & { params?: any }, res: ServerResponse) => {
+      try {
+        const userId = await protect(req, res, appRouter);
+        if (!userId) return;
+
+        const { status } = await appRouter.parseJsonBody(req);
+        if (!['PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(status)) {
+            return appRouter.sendResponse(res, 400, { message: "Invalid status" });
+        }
+
+        const order = await Order.findById(req.params.id);
+        if (!order) return appRouter.sendResponse(res, 404, { message: "Order not found" });
+
+        order.status = status;
+        await order.save();
+
+        if (status === 'DELIVERED') {
+          // --- PUSH NOTIFICATION: ORDER DELIVERED ---
+          await sendPushNotification(
+            order.userId,
+            "Order Delivered! 📦",
+            `Your order #${order.id} has been successfully delivered. Thank you for shopping with us!`,
+            { orderId: order.id.toString(), type: 'DELIVERY' }
+          );
+          // ------------------------------------------
+        } else if (status === 'SHIPPED') {
+          // Optional extra trigger
+          await sendPushNotification(
+            order.userId,
+            "Order Shipped! 🚚",
+            `Your order #${order.id} is on the way!`,
+            { orderId: order.id.toString(), type: 'SHIPPING' }
+          );
+        }
+
+        appRouter.sendResponse(res, 200, { success: true, order });
+      } catch (e: any) {
+        appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
+      }
+    }
+  );
+
   // @desc    Check payment status manually
   // @route   POST /api/v1/orders/:id/check-payment
   // @access  Private
@@ -632,12 +752,50 @@ export default function (appRouter: Router) {
           }
 
           await order.save();
+
+          // --- PUSH NOTIFICATION: ORDER PAID / UPDATED ---
+          await sendPushNotification(
+            order.userId,
+            "Payment Confirmed!",
+            `Your payment for order #${order.id} was successful.`
+          );
+          // -----------------------------------------------
         }
+
+        // ➕ NEW — Populate product details in items so Flutter gets real names/images
+        const populatedOrder = await Order.findById(order._id);
+        const rawItems = populatedOrder?.items || order.items;
+
+        console.log(`[check-payment] Populating ${rawItems.length} items for order #${order.id}`);
+
+        const populatedItems = await Promise.all(
+          rawItems.map(async (item: any) => {
+            // Cast to Number — auto-increment IDs are stored and queried as Numbers
+            const productId = Number(item.product);
+            console.log(`[check-payment]  → looking up product id: ${productId} (original: ${item.product}, type: ${typeof item.product})`);
+            const prod = await Product.findOne({ _id: productId }).select('_id name sku images sellingPrice quantity');
+            console.log(`[check-payment]  → found: ${prod ? prod.name : 'NULL - product not found!'}`);
+            return {
+              _id: item._id,
+              product: prod
+                ? prod.toObject()
+                : { _id: productId, name: 'Unknown Product', images: [], sku: '', sellingPrice: item.unitPrice ?? 0, quantity: 0 },
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              subTotal: item.subTotal,
+            };
+          })
+        );
+
+        const orderWithProducts = {
+          ...(populatedOrder || order).toObject(),
+          items: populatedItems,
+        };
 
         appRouter.sendResponse(res, 200, {
           message: "Check completed",
           abaResponse,
-          order
+          order: orderWithProducts
         });
 
       } catch (e: any) {
