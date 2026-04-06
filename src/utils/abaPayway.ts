@@ -194,7 +194,7 @@ export const generateTokenHash = (p: any): string => {
 export const purchaseByToken = async (params: any) => {
   const baseWebhookUrl = params.baseUrl
     ? `${params.baseUrl}/api/v1/orders/payway-webhook`
-    : (process.env.ABA_WEBHOOK_URL || "");
+    : (process.env.ABA_RETURN_URL || "");  // fallback to ABA_RETURN_URL env var
   // Both hash and payload use the base64-encoded URL — they must match
   const returnUrlBase64 = baseWebhookUrl
     ? Buffer.from(baseWebhookUrl).toString("base64")

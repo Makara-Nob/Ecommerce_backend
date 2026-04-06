@@ -979,20 +979,21 @@ export default function (appRouter: Router) {
               // If this was linked during checkout, charge the order immediately
               if (order) {
                 try {
+                  const nameparts = (orderUser?.fullName || "Customer").split(" ");
                   const purchaseResult = await purchaseByToken({
                     tran_id: order.paywayTranId,
                     amount: order.netAmount,
                     items: order.items.map((i: any) => ({
-                      name: "Product",
+                      name: `Product_${i.product}`,
                       quantity: i.quantity,
                       price: parseFloat(i.unitPrice).toFixed(2),
                     })),
                     pwt: cardStatus.pwt,
                     ctid: ctid || "",
-                    firstname: orderUser?.fullName || "Customer",
-                    lastname: "",
+                    firstname: nameparts[0] || "Customer",
+                    lastname: nameparts.slice(1).join(" ") || "",
                     email: orderUser?.email || "",
-                    return_param: String(order.id),
+                    baseUrl: getBaseUrl(req),
                   });
 
                   if (purchaseResult?.payment_status?.status === "0") {
