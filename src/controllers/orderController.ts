@@ -906,9 +906,9 @@ export default function (appRouter: Router) {
         const tran_id = payload.tran_id;
         const status = payload.status;
 
-        if (tran_id) {
-          // Check if this is a Link Card (COF) callback by looking for pwt in return_params
-          let returnParams = payload.return_params;
+        // --- 1. Check for Link Card (COF) Tokenization ---
+        // Tokenization operations do not return a tran_id, they only return return_params
+        let returnParams = payload.return_params;
           
           // Robustly handle if ABA sends return_params as a stringified JSON
           if (typeof returnParams === "string") {
@@ -998,20 +998,27 @@ export default function (appRouter: Router) {
                     order.paywayStatus = `TOKEN_PAY_FAILED_${purchaseResult?.payment_status?.code}`;
                     await order.save();
                   }
-                } catch (tokenErr) {
-                  console.error("[ABA Webhook] purchaseByToken Error:", tokenErr);
+                } catch (err) {
+                  console.error("[ABA Webhook] Error during purchaseByToken:", err);
                 }
               }
+            } else {
+              console.log("[ABA Webhook] User not found for return_param:", returnParamVal);
             }
-          } else {
-            // OPTION #2: Standard Purchase callback
+            
+            if (!tran_id) {
+              return appRouter.sendResponse(res, 200, { message: "Tokenization recorded" });
+            }
+          }
+
+          // --- 2. Check for Standard Payment ---
+          if (tran_id) {
             const order = await Order.findOne({ paywayTranId: tran_id });
             if (order) {
               if (status === "0" && order.status === "PENDING") {
                 order.status = "CONFIRMED";
                 order.paywayStatus = "APPROVED";
 
-                // Deduct stock upon successful payment
                 for (const item of order.items) {
                   const product = await Product.findById(item.product);
                   if (product) {
@@ -1028,8 +1035,7 @@ export default function (appRouter: Router) {
               }
             }
           }
-        }
-
+          
         // Must respond HTTP 200 to acknowledge receipt to ABA
         // If this is a browser redirect (GET) from ABA, we return an HTML success page.
         // Webhooks (POST) still get JSON.
