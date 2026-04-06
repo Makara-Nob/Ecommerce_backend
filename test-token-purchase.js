@@ -4,122 +4,88 @@
  * Standalone test for ABA PayWay Purchase-by-Token API.
  * Run: node test-token-purchase.js
  * 
- * Uses the saved ctid/pwt from a previous COF enrollment.
- * Adjust CTID, PWT, AMOUNT as needed.
+ * IMPORTANT: Update CTID and PWT with FRESH values from a new card enrollment.
+ * Tokens are single-use — a failed attempt burns them.
  */
 
 const crypto = require("crypto");
-const https  = require("https");
+const https = require("https");
 
-// ─────────────────────────────────────────────────────────────────
-// CONFIG — edit these values
-// ─────────────────────────────────────────────────────────────────
-const MERCHANT_ID  = "ec474354";
-const API_KEY      = "3f05f2d2ad4243246f9953d04aa43aea3a8bbeb9";
-const TOKEN_URL    = "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase";
-const WEBHOOK_URL  = "https://ecommerce-backend-v8k1.onrender.com/api/v1/orders/payway-webhook";
+// ─── CONFIG ──────────────────────────────────────────────────────
+const MERCHANT_ID = "ec474354";
+const API_KEY = "3f05f2d2ad4243246f9953d04aa43aea3a8bbeb9";
+const TOKEN_URL = "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase";
+const WEBHOOK_URL = "https://ecommerce-backend-v8k1.onrender.com/api/v1/orders/payway-webhook";
 
-// ← Fresh ctid and pwt from latest card enrollment (update after each re-enroll)
+// ← UPDATE THESE after each fresh card enrollment
+// Get new values from backend logs: "[ABA Webhook] Card linked..."
 const CTID = "525405196d48c9e8839e976f5f97f5ffa7d583";
-const PWT  = "52540528B09AB05F9F01677F91ECCBBF8C7D7B975AE39E440501E563AE003A0482C1D4";
+const PWT = "52540528B09AB05F9F01677F91ECCBBF8C7D7B975AE39E440501E563AE003A0482C1D4";
 
-const AMOUNT    = "10.00";   // test with a small amount
-const FIRSTNAME = "Admin";
-const LASTNAME  = "Test";
-const EMAIL     = "admin@gmail.com";
-const PHONE     = "";
+const AMOUNT = "10.00";
+const FIRSTNAME = "Super";      // Matches production (split name)
+const LASTNAME = "Administrator";
+const EMAIL = "admin@gmail.com";
+const PHONE = "";
 // ─────────────────────────────────────────────────────────────────
 
 function getReqTime() {
   const d = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
-function randomTranId() {
-  return Date.now().toString() + Math.floor(Math.random() * 1000);
-}
+const req_time = getReqTime();
+const tran_id = req_time + Math.floor(Math.random() * 999999).toString().padStart(6, "0");
+const items_json = JSON.stringify([{ name: "TestItem", quantity: 1, price: AMOUNT }]);
+const items = Buffer.from(items_json).toString("base64");
+const shipping = "0.00";
+const currency = "USD";
+const return_url_b64 = Buffer.from(WEBHOOK_URL).toString("base64");
 
-const req_time    = getReqTime();
-const tran_id     = randomTranId();
-const itemsJson   = JSON.stringify([{ name: "TestItem", quantity: 1, price: AMOUNT }]);
-const items       = Buffer.from(itemsJson).toString("base64");
-const shipping    = "0.00";
-const currency    = "USD";
-const return_url_plain = WEBHOOK_URL;
-const return_url_b64   = Buffer.from(WEBHOOK_URL).toString("base64");
-const custom_fields    = "";
-const return_params    = "";
-const payout           = "";
-
-// ─── Test multiple hash variants ─────────────────────────────────
-const variants = [
-  {
-    label: "A: amount=10.00 (toFixed), return_url=base64",
-    amountStr: parseFloat(AMOUNT).toFixed(2),
-    returnUrlHash: return_url_b64,
-  },
-  {
-    label: "B: amount=10 (plain number string), return_url=base64",
-    amountStr: String(parseFloat(AMOUNT)),
-    returnUrlHash: return_url_b64,
-  },
-  {
-    label: "C: amount=10.00 (toFixed), return_url=PLAIN",
-    amountStr: parseFloat(AMOUNT).toFixed(2),
-    returnUrlHash: return_url_plain,
-  },
-  {
-    label: "D: amount=10 (plain), return_url=PLAIN",
-    amountStr: String(parseFloat(AMOUNT)),
-    returnUrlHash: return_url_plain,
-  },
-  {
-    label: "E: amount=10.00, no ctid/pwt in hash",
-    amountStr: parseFloat(AMOUNT).toFixed(2),
-    returnUrlHash: return_url_b64,
-    skipCtidPwt: true,
-  },
-];
-
-function buildHash(amountStr, returnUrlHash, skipCtidPwt = false) {
-  const ctidPwt = skipCtidPwt ? "" : CTID + PWT;
+// ─── Hash builder ─────────────────────────────────────────────────
+// PHP (string)$number strips trailing zeros:
+//   (string)10.00  → "10"
+//   (string)1439.1 → "1439.1"
+//   (string)0.0    → "0"
+function buildHash(amountStr, returnUrlHash, typeStr = "pre-auth", shippingStr = "0") {
   const s =
-    req_time + MERCHANT_ID + tran_id + amountStr + items + shipping +
-    ctidPwt +
+    req_time + MERCHANT_ID + tran_id + amountStr + items + shippingStr +
+    CTID + PWT +
     FIRSTNAME + LASTNAME + EMAIL + PHONE +
-    "purchase" +
+    typeStr +
     returnUrlHash +
-    currency + custom_fields + return_params + payout;
+    currency + "" + "" + "";  // custom_fields + return_params + payout
   return {
     hashString: s,
     hash: crypto.createHmac("sha512", API_KEY).update(s).digest("base64"),
   };
 }
 
-function sendRequest(variantLabel, hash, callback) {
+function sendRequest(label, hash, payloadReturnUrl, includeType = true, callback) {
   const payload = {
     req_time,
     merchant_id: MERCHANT_ID,
-    type: "purchase",
     items,
     amount: parseFloat(AMOUNT),
     tran_id,
     ctid: CTID,
     pwt: PWT,
     continue_success_url: "",
-    return_url: return_url_b64,
-    return_params,
+    return_url: payloadReturnUrl,
+    return_params: "",
     hash,
-    custom_fields,
+    custom_fields: "",
     firstname: FIRSTNAME,
     lastname: LASTNAME,
     phone: PHONE,
     email: EMAIL,
   };
+  // Only add type if flag set (since it's optional per docs)
+  if (includeType) payload.type = "pre-auth";
 
   const body = JSON.stringify(payload);
-  const url  = new URL(TOKEN_URL);
+  const url = new URL(TOKEN_URL);
   const opts = {
     hostname: url.hostname,
     path: url.pathname,
@@ -136,40 +102,72 @@ function sendRequest(variantLabel, hash, callback) {
     res.on("end", () => {
       try {
         const json = JSON.parse(data);
-        const ok = res.statusCode === 200 && (json?.status?.code === "0" || json?.status?.code === 0);
-        const status = ok ? "✅ SUCCESS" : `❌ ${json?.status?.message}`;
-        console.log(`  [${variantLabel}] HTTP ${res.statusCode} → ${status}`);
-        if (ok) console.log("  Full response:", JSON.stringify(json, null, 2));
+        const code = json?.status?.code;
+        const msg = json?.status?.message;
+        const ok = res.statusCode === 200 && (code === "0" || code === 0);
+        if (ok) {
+          console.log(`\n✅ [${label}] SUCCESS!`);
+          console.log("Full response:", JSON.stringify(json, null, 2));
+        } else {
+          console.log(`❌ [${label}] HTTP ${res.statusCode} → ${msg} (code: ${code})`);
+        }
       } catch {
-        console.log(`  [${variantLabel}] HTTP ${res.statusCode} raw:`, data.substring(0, 200));
+        console.log(`[${label}] HTTP ${res.statusCode} raw:`, data.substring(0, 300));
       }
-      callback();
+      if (callback) callback();
     });
   });
-  req.on("error", (e) => { console.error(`  [${variantLabel}] Error:`, e.message); callback(); });
+  req.on("error", (e) => { console.error(`[${label}] Error:`, e.message); if (callback) callback(); });
   req.write(body);
   req.end();
 }
 
 console.log("\n══════════════════════════════════════════════════════════════");
-console.log("  ABA PayWay Token Purchase — Hash Variant Test");
-console.log("  req_time:", req_time, "| tran_id:", tran_id);
+console.log("  ABA PayWay Token Purchase Test");
+console.log(`  req_time: ${req_time}  |  tran_id: ${tran_id}`);
+console.log(`  ctid: ${CTID}`);
 console.log("══════════════════════════════════════════════════════════════\n");
 
-// Run variants sequentially with 1s gap (avoid rate limiting)
-let i = 0;
+// Sequential variant runner
+const variants = [
+  {
+    label: '1) PHP Format: type="pre-auth", amount="10", shipping="0"',
+    amountStr: String(parseFloat(AMOUNT)),
+    shippingStr: "0",
+    returnUrlHash: return_url_b64,
+    typeStr: "pre-auth",
+    includeType: true,
+  },
+  {
+    label: '2) type="pre-auth", amount="10.00", shipping="0.00"',
+    amountStr: parseFloat(AMOUNT).toFixed(2),
+    shippingStr: "0.00",
+    returnUrlHash: return_url_b64,
+    typeStr: "pre-auth",
+    includeType: true,
+  },
+  {
+    label: '3) type="pre-auth", amount="10", return_url=PLAIN',
+    amountStr: String(parseFloat(AMOUNT)),
+    shippingStr: "0",
+    returnUrlHash: WEBHOOK_URL,
+    typeStr: "pre-auth",
+    includeType: true,
+  }
+];
+
+let vi = 0;
 function runNext() {
-  if (i >= variants.length) {
-    console.log("\nAll variants tested.\n");
+  if (vi >= variants.length) {
+    console.log("\nAll variants tested. Tokens may be burned — re-enroll for next test.\n");
     return;
   }
-  const v = variants[i++];
-  const { hashString, hash } = buildHash(v.amountStr, v.returnUrlHash, v.skipCtidPwt);
-  console.log(`\nVariant ${i}: ${v.label}`);
-  console.log(`  Hash String: ${hashString.substring(0, 80)}...`);
+  const v = variants[vi++];
+  const { hashString, hash } = buildHash(v.amountStr, v.returnUrlHash, v.typeStr, v.shippingStr);
+  console.log(`\nVariant ${vi}: ${v.label}`);
+  console.log(`  Hash String: ...${hashString.slice(-60)}`);
   console.log(`  Hash:        ${hash}`);
-  setTimeout(() => sendRequest(v.label, hash, () => setTimeout(runNext, 1200)), 300);
+  setTimeout(() => sendRequest(v.label, hash, return_url_b64, v.includeType, () => setTimeout(runNext, 1500)), 300);
 }
 
 runNext();
-

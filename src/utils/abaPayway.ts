@@ -158,10 +158,8 @@ export const getCofPayload = (info: any, baseUrl?: string) => {
 
 // ================= TOKEN HASH =================
 export const generateTokenHash = (p: any): string => {
-  // EXACT order from ABA PayWay official PHP sample:
-  // $b4hash = $req_time . $merchant_id . $tran_id . $amount . $items . $shipping
-  //         . $ctid . $pwt . $firstname . $lastname . $email . $phone . $type
-  //         . $return_url . $currency . $custom_fields . $return_params . $payout;
+  // EXACT order from ABA PayWay official PHP sample.
+  // `type` = pre-auth for COF token purchase.
   const hashString =
     (p.req_time ?? "") +
     (p.merchant_id ?? "") +
@@ -211,16 +209,16 @@ export const purchaseByToken = async (params: any) => {
     req_time: getReqTime(),
     merchant_id: ABA_PAYWAY_MERCHANT_ID,
     tran_id: params.tran_id.toString(),
-    amount: parseFloat(params.amount).toFixed(2), // string for hash
+    amount: String(parseFloat(params.amount)), // PHP strips trailing zeros: 10.00→"10", 1439.10→"1439.1"
     items: itemsBase64,
-    shipping: params.shipping ? parseFloat(params.shipping).toFixed(2) : "0.00",
+    shipping: String(parseFloat(params.shipping || "0")), // 0.00→"0"
     ctid: params.ctid || "",
     pwt: params.pwt || "",
     firstname: params.firstname || "",
     lastname: params.lastname || "",
     email: params.email || "",
     phone: params.phone || "",
-    type: params.type || "purchase",
+    type: "pre-auth",
     return_url: returnUrlBase64,  // MUST match payload — base64 encoded
     currency: params.currency || "USD",
     custom_fields: params.custom_fields || "",
@@ -231,10 +229,7 @@ export const purchaseByToken = async (params: any) => {
   // Inject hash in the position the doc sample shows (after return_param)
   const hash = generateTokenHash(pre);
 
-  // Final payload in EXACT doc sample field order:
-  // req_time, merchant_id, type, items, amount, tran_id,
-  // [ctid, pwt for token], continue_success_url, return_url,
-  // return_params, hash, custom_fields, firstname, lastname, phone, email
+  // Final payload — type: pre-auth for COF token purchase
   const payload = {
     req_time: pre.req_time,
     merchant_id: pre.merchant_id,
