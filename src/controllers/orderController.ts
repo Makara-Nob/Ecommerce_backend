@@ -643,6 +643,7 @@ export default function (appRouter: Router) {
           price: parseFloat(i.unitPrice).toFixed(2),
         }));
 
+        const baseUrl = getBaseUrl(req);
         const purchaseResult = await purchaseByToken({
           tran_id: order.paywayTranId,
           amount: order.netAmount,
@@ -652,6 +653,7 @@ export default function (appRouter: Router) {
           firstname: user.fullName?.split(' ')[0] || 'Customer',
           lastname: user.fullName?.split(' ').slice(1).join(' ') || '',
           email: user.email,
+          baseUrl,
         });
 
         const isSuccess =
