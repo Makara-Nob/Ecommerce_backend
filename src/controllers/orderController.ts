@@ -490,16 +490,20 @@ export default function (appRouter: Router) {
         let paywayApiUrl;
 
         if (paymentOption === "cards") {
-          // Use refined Link Card (COF) flow
-          paywayPayload = getCofPayload({
-            ctid: userId,
-            return_param: order.id,
+          // Standard one-time card purchase without tokenizing
+          paywayPayload = getCheckoutPayload({
+            tran_id: order.paywayTranId,
+            amount: order.netAmount,
+            items: paywayItems,
             firstname,
             lastname,
             email,
             phone: "",
+            payment_option: "cards",
+            return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
+            view_type: "checkout",
           });
-          paywayApiUrl = ABA_PAYWAY_COF_URL;
+          paywayApiUrl = ABA_PAYWAY_API_URL;
         } else {
           // Standard Purchase flow for KHQR
           paywayPayload = getCheckoutPayload({
