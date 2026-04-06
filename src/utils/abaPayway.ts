@@ -158,17 +158,15 @@ export const getCofPayload = (info: any, baseUrl?: string) => {
 
 // ================= TOKEN HASH =================
 export const generateTokenHash = (p: any): string => {
-  // CORRECT FIELD ORDER matching ABA PayWay documentation sample:
-  // req_time + merchant_id + tran_id + amount + items + shipping + ctid + pwt +
-  // firstname + lastname + phone + email + type + continue_success_url +
-  // return_url + return_param + cancel_url + currency + custom_fields + payout
+  // Hash field order matches ABA PayWay v2 documentation sample exactly.
+  // NOTE: `shipping` is NOT part of the hash for this endpoint.
+  // NOTE: phone comes before email (matching doc JSON field order).
   const hashString =
     (p.req_time ?? "") +
     (p.merchant_id ?? "") +
     (p.tran_id ?? "") +
     (p.amount ?? "") +
     (p.items ?? "") +
-    (p.shipping ?? "") +
     (p.ctid ?? "") +
     (p.pwt ?? "") +
     (p.firstname ?? "") +
@@ -179,7 +177,6 @@ export const generateTokenHash = (p: any): string => {
     (p.continue_success_url ?? "") +
     (p.return_url ?? "") +
     (p.return_param ?? "") +
-    (p.cancel_url ?? "") +
     (p.currency ?? "") +
     (p.custom_fields ?? "") +
     (p.payout ?? "");
@@ -205,13 +202,13 @@ export const purchaseByToken = async (params: any) => {
     JSON.stringify(params.items)
   ).toString("base64");
 
-  const payload: any = {
+  // Build hash-input fields first (no `hash` key yet)
+  const pre: any = {
     req_time: getReqTime(),
     merchant_id: ABA_PAYWAY_MERCHANT_ID,
     tran_id: params.tran_id.toString(),
     amount: parseFloat(params.amount).toFixed(2),
     items: itemsBase64,
-    shipping: params.shipping || "0.00",
     ctid: params.ctid || "",
     pwt: params.pwt || "",
     firstname: params.firstname || "",
@@ -222,13 +219,36 @@ export const purchaseByToken = async (params: any) => {
     continue_success_url: params.continue_success_url || "",
     return_url: returnUrlBase64,
     return_param: params.return_param || "",
-    cancel_url: params.cancel_url || "",
     currency: params.currency || "USD",
     custom_fields: params.custom_fields || "",
     payout: params.payout || "",
   };
 
-  payload.hash = generateTokenHash(payload);
+  // Inject hash in the position the doc sample shows (after return_param)
+  const hash = generateTokenHash(pre);
+
+  // Final payload in exact doc sample field order
+  const payload = {
+    req_time: pre.req_time,
+    merchant_id: pre.merchant_id,
+    type: pre.type,
+    items: pre.items,
+    amount: parseFloat(pre.amount), // number, not string — matches ABA doc sample
+    tran_id: pre.tran_id,
+    ctid: pre.ctid,
+    pwt: pre.pwt,
+    continue_success_url: pre.continue_success_url,
+    return_url: pre.return_url,
+    return_param: pre.return_param,
+    hash,
+    custom_fields: pre.custom_fields,
+    firstname: pre.firstname,
+    lastname: pre.lastname,
+    phone: pre.phone,
+    email: pre.email,
+  };
+
+  console.log("[pay-by-token] Final payload:", JSON.stringify(payload, null, 2));
 
   const res = await axios.post(ABA_PAYWAY_TOKEN_URL, payload, {
     headers: { "Content-Type": "application/json" },

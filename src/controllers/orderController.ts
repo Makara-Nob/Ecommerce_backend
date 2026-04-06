@@ -673,8 +673,10 @@ export default function (appRouter: Router) {
           });
         }
       } catch (e: any) {
-        console.error("[pay-by-token]", e);
-        appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
+        const abaBody = e?.response?.data;
+        console.error("[pay-by-token] ABA Error Body:", JSON.stringify(abaBody ?? {}, null, 2));
+        console.error("[pay-by-token] HTTP Status:", e?.response?.status);
+        appRouter.sendResponse(res, 500, { message: e.message || "Server Error", abaError: abaBody });
       }
     }
   );
