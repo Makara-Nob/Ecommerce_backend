@@ -231,28 +231,28 @@ export const purchaseByToken = async (params: any) => {
   // Inject hash in the position the doc sample shows (after return_param)
   const hash = generateTokenHash(pre);
 
-  // Final payload matching ABA docs sample JSON field order exactly
+  // Final payload in EXACT doc sample field order:
+  // req_time, merchant_id, type, items, amount, tran_id,
+  // [ctid, pwt for token], continue_success_url, return_url,
+  // return_params, hash, custom_fields, firstname, lastname, phone, email
   const payload = {
     req_time: pre.req_time,
     merchant_id: pre.merchant_id,
+    type: pre.type,
+    items: pre.items,
+    amount: parseFloat(pre.amount),  // number per docs
     tran_id: pre.tran_id,
     ctid: pre.ctid,
     pwt: pre.pwt,
+    continue_success_url: "",
+    return_url: returnUrlBase64,     // base64 in payload; plain was used for hash
+    return_params: pre.return_params,
+    hash,
+    custom_fields: pre.custom_fields,
     firstname: pre.firstname,
     lastname: pre.lastname,
-    email: pre.email,
     phone: pre.phone,
-    type: pre.type,
-    items: pre.items,
-    amount: parseFloat(pre.amount),    // number per docs
-    shipping: parseFloat(pre.shipping), // number per docs
-    return_url: returnUrlBase64,        // base64 in payload, plain was used for hash
-    continue_success_url: "",
-    currency: pre.currency,
-    custom_fields: pre.custom_fields,
-    return_params: pre.return_params,
-    payout: pre.payout,
-    hash,
+    email: pre.email,
   };
 
   console.log("[pay-by-token] Final payload:", JSON.stringify(payload, null, 2));
