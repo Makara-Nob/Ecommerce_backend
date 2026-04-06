@@ -478,18 +478,30 @@ export default function (appRouter: Router) {
         const fallbackNames = user && user.fullName ? user.fullName.split(" ") : ["Customer", ""];
         const firstname = fallbackNames[0];
         const lastname = fallbackNames.slice(1).join(" ") || "";
-        const email = user ? user.email : "";
+        const email = user && user.email ? user.email : "";
+
+        const baseUrl = getBaseUrl(req);
 
         const paywayItems = order.items.map((i: any) => ({
           name: `Product_${i.product}`,
           quantity: i.quantity,
           price: parseFloat(i.unitPrice).toFixed(2),
         }));
-
         let paywayPayload;
         let paywayApiUrl;
 
-        if (paymentOption === "cards") {
+        if (paymentOption === "cards_new") {
+          // Tokenize the card AND charge the order at the same time via webhook
+          paywayPayload = getCofPayload({
+            tran_id: order.paywayTranId,
+            return_param: String(order.id),
+            firstname,
+            lastname,
+            email,
+            phone: "",
+          }, baseUrl);
+          paywayApiUrl = ABA_PAYWAY_COF_URL;
+        } else if (paymentOption === "cards") {
           // Standard one-time card purchase without tokenizing
           paywayPayload = getCheckoutPayload({
             tran_id: order.paywayTranId,
@@ -502,7 +514,7 @@ export default function (appRouter: Router) {
             payment_option: "cards",
             return_deeplink: process.env.ABA_RETURN_DEEPLINK || "",
             view_type: "checkout",
-          });
+          }, baseUrl); // pass baseUrl here as well to be safe
           paywayApiUrl = ABA_PAYWAY_API_URL;
         } else {
           // Standard Purchase flow for KHQR
