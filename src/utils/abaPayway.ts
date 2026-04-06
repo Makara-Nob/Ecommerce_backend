@@ -158,10 +158,10 @@ export const getCofPayload = (info: any, baseUrl?: string) => {
 
 // ================= TOKEN HASH =================
 export const generateTokenHash = (p: any): string => {
-  // FIELDS ORDER for ABA Purchase by Token 2.0:
+  // CORRECT FIELD ORDER matching ABA PayWay documentation sample:
   // req_time + merchant_id + tran_id + amount + items + shipping + ctid + pwt +
-  // firstname + lastname + email + phone + type + payment_option +
-  // currency + return_url + custom_fields + return_params + payout
+  // firstname + lastname + phone + email + type + continue_success_url +
+  // return_url + return_param + cancel_url + currency + custom_fields + payout
   const hashString =
     (p.req_time ?? "") +
     (p.merchant_id ?? "") +
@@ -173,13 +173,15 @@ export const generateTokenHash = (p: any): string => {
     (p.pwt ?? "") +
     (p.firstname ?? "") +
     (p.lastname ?? "") +
-    (p.email ?? "") +
     (p.phone ?? "") +
+    (p.email ?? "") +
     (p.type ?? "") +
+    (p.continue_success_url ?? "") +
     (p.return_url ?? "") +
+    (p.return_param ?? "") +
+    (p.cancel_url ?? "") +
     (p.currency ?? "") +
     (p.custom_fields ?? "") +
-    (p.return_params ?? "") +
     (p.payout ?? "");
 
   console.log("[ABA Token] HASH STRING:", hashString);
@@ -192,6 +194,13 @@ export const generateTokenHash = (p: any): string => {
 
 // ================= PURCHASE BY TOKEN =================
 export const purchaseByToken = async (params: any) => {
+  const baseWebhookUrl = params.baseUrl
+    ? `${params.baseUrl}/api/v1/orders/payway-webhook`
+    : (process.env.ABA_WEBHOOK_URL || "");
+  const returnUrlBase64 = baseWebhookUrl
+    ? Buffer.from(baseWebhookUrl).toString("base64")
+    : "";
+
   const itemsBase64 = Buffer.from(
     JSON.stringify(params.items)
   ).toString("base64");
@@ -207,13 +216,15 @@ export const purchaseByToken = async (params: any) => {
     pwt: params.pwt || "",
     firstname: params.firstname || "",
     lastname: params.lastname || "",
-    email: params.email || "",
     phone: params.phone || "",
+    email: params.email || "",
     type: params.type || "purchase",
+    continue_success_url: params.continue_success_url || "",
+    return_url: returnUrlBase64,
+    return_param: params.return_param || "",
+    cancel_url: params.cancel_url || "",
     currency: params.currency || "USD",
-    return_url: params.return_url || "",
     custom_fields: params.custom_fields || "",
-    return_params: params.return_params || "",
     payout: params.payout || "",
   };
 
