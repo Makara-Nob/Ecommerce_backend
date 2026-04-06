@@ -176,8 +176,8 @@ export const generateTokenHash = (p: any): string => {
     (p.email ?? "") +
     (p.phone ?? "") +
     (p.type ?? "") +
-    (p.currency ?? "") +
     (p.return_url ?? "") +
+    (p.currency ?? "") +
     (p.custom_fields ?? "") +
     (p.return_params ?? "") +
     (p.payout ?? "");
