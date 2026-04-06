@@ -37,9 +37,9 @@ function getReqTime() {
 
 const req_time = getReqTime();
 const tran_id = req_time + Math.floor(Math.random() * 999999).toString().padStart(6, "0");
-const items_json = JSON.stringify([{ name: "TestItem", quantity: 1, price: AMOUNT }]);
+const items_json = JSON.stringify([{ name: "TestItem", quantity: 1, price: parseFloat(AMOUNT) }]);
 const items = Buffer.from(items_json).toString("base64");
-const shipping = "0.00";
+const shipping = "0";
 const currency = "USD";
 const return_url_b64 = Buffer.from(WEBHOOK_URL).toString("base64");
 
@@ -62,19 +62,21 @@ function buildHash(amountStr, returnUrlHash, typeStr = "pre-auth", shippingStr =
   };
 }
 
-function sendRequest(label, hash, payloadReturnUrl, includeType = true, callback) {
+function sendRequest(label, hash, payloadReturnUrl, includeType = true, shippingVal = 0, callback) {
   const payload = {
     req_time,
     merchant_id: MERCHANT_ID,
     items,
     amount: parseFloat(AMOUNT),
+    shipping: shippingVal,
     tran_id,
     ctid: CTID,
     pwt: PWT,
     continue_success_url: "",
     return_url: payloadReturnUrl,
-    return_params: "",
     hash,
+    currency,
+    return_params: "",
     custom_fields: "",
     firstname: FIRSTNAME,
     lastname: LASTNAME,
@@ -167,7 +169,7 @@ function runNext() {
   console.log(`\nVariant ${vi}: ${v.label}`);
   console.log(`  Hash String: ...${hashString.slice(-60)}`);
   console.log(`  Hash:        ${hash}`);
-  setTimeout(() => sendRequest(v.label, hash, return_url_b64, v.includeType, () => setTimeout(runNext, 1500)), 300);
+  setTimeout(() => sendRequest(v.label, hash, return_url_b64, v.includeType, parseFloat(v.shippingStr), () => setTimeout(runNext, 1500)), 300);
 }
 
 runNext();

@@ -229,20 +229,23 @@ export const purchaseByToken = async (params: any) => {
   // Inject hash in the position the doc sample shows (after return_param)
   const hash = generateTokenHash(pre);
 
-  // Final payload — type: pre-auth for COF token purchase
+  // Final payload — MUST include all fields used in the hash (like currency/shipping)
+  // even if they are optional, so the server can re-verify the signature correctly.
   const payload = {
     req_time: pre.req_time,
     merchant_id: pre.merchant_id,
     type: pre.type,
     items: pre.items,
     amount: parseFloat(pre.amount),  // number per docs
+    shipping: parseFloat(pre.shipping), // include in payload if in hash!
     tran_id: pre.tran_id,
     ctid: pre.ctid,
     pwt: pre.pwt,
     continue_success_url: "",
     return_url: returnUrlBase64,     // base64 in payload; plain was used for hash
+    hash, // should be exactly after return_url or return_params per samples
+    currency: pre.currency,       // include in payload if in hash!
     return_params: pre.return_params,
-    hash,
     custom_fields: pre.custom_fields,
     firstname: pre.firstname,
     lastname: pre.lastname,

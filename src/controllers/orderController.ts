@@ -986,7 +986,7 @@ export default function (appRouter: Router) {
                     items: order.items.map((i: any) => ({
                       name: `Product_${i.product}`,
                       quantity: i.quantity,
-                      price: parseFloat(i.unitPrice).toFixed(2),
+                      price: parseFloat(i.unitPrice),
                     })),
                     pwt: cardStatus.pwt,
                     ctid: ctid || "",
