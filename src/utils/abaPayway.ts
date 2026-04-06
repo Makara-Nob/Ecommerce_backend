@@ -145,7 +145,7 @@ export const getCofPayload = (info: any, baseUrl?: string) => {
     return_url: Buffer.from(baseUrl ? `${baseUrl}${successPath}` : (process.env.ABA_WEBHOOK_URL || "")).toString("base64"),
     continue_add_card_success_url: baseUrl ? `${baseUrl}${successPath}` : (process.env.ABA_SUCCESS_URL || ""),
   };
-  
+
   if (info.phone && info.phone.trim() !== '') {
     payload.phone = info.phone;
   }
@@ -195,6 +195,9 @@ export const purchaseByToken = async (params: any) => {
   const baseWebhookUrl = params.baseUrl
     ? `${params.baseUrl}/api/v1/orders/payway-webhook`
     : (process.env.ABA_WEBHOOK_URL || "");
+  // Hash uses the PLAIN URL (same as standard checkout);
+  // JSON payload sends the base64-encoded version
+  const returnUrlPlain = baseWebhookUrl;
   const returnUrlBase64 = baseWebhookUrl
     ? Buffer.from(baseWebhookUrl).toString("base64")
     : "";
@@ -210,7 +213,7 @@ export const purchaseByToken = async (params: any) => {
     tran_id: params.tran_id.toString(),
     amount: parseFloat(params.amount).toFixed(2), // string for hash
     items: itemsBase64,
-    shipping: params.shipping || "0.00",
+    shipping: params.shipping ? parseFloat(params.shipping).toFixed(2) : "0.00",
     ctid: params.ctid || "",
     pwt: params.pwt || "",
     firstname: params.firstname || "",
@@ -218,11 +221,10 @@ export const purchaseByToken = async (params: any) => {
     email: params.email || "",
     phone: params.phone || "",
     type: params.type || "purchase",
-    continue_success_url: params.continue_success_url || "",
-    return_url: returnUrlBase64,
-    return_params: params.return_params || "",
+    return_url: returnUrlPlain,  // PLAIN URL for hash
     currency: params.currency || "USD",
     custom_fields: params.custom_fields || "",
+    return_params: params.return_params || "",
     payout: params.payout || "",
   };
 
@@ -244,8 +246,8 @@ export const purchaseByToken = async (params: any) => {
     items: pre.items,
     amount: parseFloat(pre.amount),    // number per docs
     shipping: parseFloat(pre.shipping), // number per docs
-    return_url: pre.return_url,
-    continue_success_url: pre.continue_success_url,
+    return_url: returnUrlBase64,        // base64 in payload, plain was used for hash
+    continue_success_url: "",
     currency: pre.currency,
     custom_fields: pre.custom_fields,
     return_params: pre.return_params,
@@ -315,7 +317,7 @@ export const verifyWebhookSignature = (
     .map((k) => {
       const val = payload[k];
       if (val === undefined || val === null) return "";
-      
+
       // If the field is an object (like return_params can be in Link Card result),
       // we need to stringify it. However, PayWay usually signs the original string.
       // We'll try to serialize it for comparison.
@@ -343,8 +345,8 @@ export const verifyWebhookSignature = (
   // FORCE SUCCESS for Link Card (COF) on sandbox if it's proving difficult to match
   // The Link Card payload structure can vary from the standard checkout notification.
   if (payload.return_params && (JSON.stringify(payload.return_params).includes('pwt') || payload.return_params.card_status)) {
-     console.log("[ABA Webhook] Link Card detected. Overriding signature validation for sandbox.");
-     return true;
+    console.log("[ABA Webhook] Link Card detected. Overriding signature validation for sandbox.");
+    return true;
   }
 
   return isValid;
