@@ -116,28 +116,34 @@ export const getCheckoutPayload = (orderInfo: any, baseUrl?: string) => {
 
 // ================= COF HASH =================
 export const generateCofHash = (p: any): string => {
-  const hashString =
-    (p.merchant_id ?? "") +
-    (p.return_param ?? "");
+  // Try to use a more robust hash if we supply req_time and tran_id
+  const hashString = p.req_time && p.tran_id 
+    ? (p.req_time + p.merchant_id + p.tran_id + (p.return_url || ""))
+    : (p.merchant_id + (p.return_param || ""));
 
   console.log("[ABA COF] HASH STRING:", hashString);
 
   return crypto
     .createHmac("sha512", ABA_PAYWAY_API_KEY)
     .update(hashString)
-    .digest("base64"); // ✅ FIXED
+    .digest("base64");
 };
 
 // ================= COF PAYLOAD =================
 export const getCofPayload = (info: any, baseUrl?: string) => {
   const successPath = "/api/v1/orders/payway-webhook";
+  const req_time = getReqTime();
+  const tran_id = info.tran_id || `link_${Math.floor(Date.now() / 1000)}`;
 
   const payload: any = {
+    req_time,
     merchant_id: ABA_PAYWAY_MERCHANT_ID,
+    tran_id,
     return_param: info.return_param || "",
     firstname: info.firstname || "",
     lastname: info.lastname || "",
     email: info.email || "",
+    return_url: Buffer.from(baseUrl ? `${baseUrl}${successPath}` : (process.env.ABA_WEBHOOK_URL || "")).toString("base64"),
     continue_add_card_success_url: baseUrl ? `${baseUrl}${successPath}` : (process.env.ABA_SUCCESS_URL || ""),
   };
   
