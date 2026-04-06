@@ -195,9 +195,7 @@ export const purchaseByToken = async (params: any) => {
   const baseWebhookUrl = params.baseUrl
     ? `${params.baseUrl}/api/v1/orders/payway-webhook`
     : (process.env.ABA_WEBHOOK_URL || "");
-  // Hash uses the PLAIN URL (same as standard checkout);
-  // JSON payload sends the base64-encoded version
-  const returnUrlPlain = baseWebhookUrl;
+  // Both hash and payload use the base64-encoded URL — they must match
   const returnUrlBase64 = baseWebhookUrl
     ? Buffer.from(baseWebhookUrl).toString("base64")
     : "";
@@ -207,6 +205,8 @@ export const purchaseByToken = async (params: any) => {
   ).toString("base64");
 
   // Build hash-input fields first (no `hash` key yet)
+  // IMPORTANT: return_url in hash MUST match what's sent in payload (base64),
+  // so ABA can recompute the same hash on their side.
   const pre: any = {
     req_time: getReqTime(),
     merchant_id: ABA_PAYWAY_MERCHANT_ID,
@@ -221,7 +221,7 @@ export const purchaseByToken = async (params: any) => {
     email: params.email || "",
     phone: params.phone || "",
     type: params.type || "purchase",
-    return_url: returnUrlPlain,  // PLAIN URL for hash
+    return_url: returnUrlBase64,  // MUST match payload — base64 encoded
     currency: params.currency || "USD",
     custom_fields: params.custom_fields || "",
     return_params: params.return_params || "",
