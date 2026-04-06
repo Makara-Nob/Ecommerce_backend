@@ -541,22 +541,39 @@ export default function (appRouter: Router) {
         const lastname = fallbackNames.slice(1).join(" ") || "";
 
         const cofPayload = getCofPayload({
-          ctid: userId,
-          return_param: `link_card_${userId}`, // distinguish from order CoF callbacks
+          return_param: `link_card_${userId}`,
           firstname,
           lastname,
           email: user.email,
           phone: user.phone || "",
         });
 
-        const responsePayload = {
-          cofPayload,
-          cofApiUrl: ABA_PAYWAY_COF_URL,
-        };
+        // POST to ABA on the server side without following the redirect.
+        // Capture the direct /add-card/... URL from Location header — Flutter loads it
+        // directly as a plain page, skipping the bottom-sheet wrapper entirely.
+        const form = new FormData();
+        Object.entries(cofPayload).forEach(([key, value]) => {
+          form.append(key, String(value));
+        });
 
-        console.log("[Link Card API] Returning Payload:", JSON.stringify(responsePayload, null, 2));
+        const abaRes = await fetch(ABA_PAYWAY_COF_URL, {
+          method: "POST",
+          body: form,
+          redirect: "manual",
+        });
 
-        appRouter.sendResponse(res, 200, responsePayload);
+        const cofUrl = abaRes.headers.get("location");
+        console.log("[Link Card API] ABA redirect URL:", cofUrl);
+
+        if (!cofUrl) {
+          const text = await abaRes.text().catch(() => "");
+          console.error("[Link Card API] ABA status:", abaRes.status, "Body:", text.slice(0, 300));
+          return appRouter.sendResponse(res, 502, {
+            message: "ABA PayWay did not return a card form URL",
+          });
+        }
+
+        appRouter.sendResponse(res, 200, { cofUrl });
       } catch (e: any) {
         appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
       }
@@ -870,13 +887,12 @@ export default function (appRouter: Router) {
               // Avoid duplicates by checking maskPan
               const alreadySaved = orderUser.savedCards?.some((c: any) => c.maskPan === cardInfo.mask_pan);
               if (!alreadySaved) {
-                const hashId = crypto.createHash("md5").update(orderUser._id.toString()).digest("hex").slice(0, 16);
                 orderUser.savedCards = orderUser.savedCards || [];
                 orderUser.savedCards.push({
                   pwt: cardInfo.pwt,
                   maskPan: cardInfo.mask_pan,
                   cardType: cardInfo.card_type,
-                  ctid: hashId,
+                  ctid: "",
                 });
                 await orderUser.save();
                 console.log(`[ABA Webhook] Card saved for user ${orderUser._id}: ${cardInfo.mask_pan}`);
@@ -885,7 +901,6 @@ export default function (appRouter: Router) {
               // If this was linked during checkout, charge the order immediately
               if (order) {
                 try {
-                  const hashId = crypto.createHash("md5").update(orderUser._id.toString()).digest("hex").slice(0, 16);
                   const purchaseResult = await purchaseByToken({
                     tran_id: order.paywayTranId,
                     amount: order.netAmount,
@@ -895,7 +910,7 @@ export default function (appRouter: Router) {
                       price: parseFloat(i.unitPrice).toFixed(2),
                     })),
                     pwt: cardInfo.pwt,
-                    ctid: hashId,
+                    ctid: "",
                     firstname: orderUser?.fullName || "Customer",
                     lastname: "",
                     email: orderUser?.email || "",
