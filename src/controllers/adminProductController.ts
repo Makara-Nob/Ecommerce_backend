@@ -6,6 +6,76 @@ import { protect, admin } from '../utils/authPlugin';
 export default function(appRouter: Router) {
     /**
      * @swagger
+     * /api/v1/admin/products/fetch:
+     *   post:
+     *     summary: Fetch all products with post method (Admin view)
+     *     tags: [Admin - Products]
+     *     security:
+     *       - bearerAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               pageNo:
+     *                 type: integer
+     *               pageSize:
+     *                 type: integer
+     *               search:
+     *                 type: string
+     *     responses:
+     *       200:
+     *         description: A list of products with pagination data
+     */
+    appRouter.post('/api/v1/admin/products/fetch', async (req: any, res: ServerResponse) => {
+        try {
+            if (!await admin(req, res, appRouter)) return;
+
+            const body = await appRouter.parseJsonBody(req);
+            const page = parseInt(body.pageNo as string) || 1;
+            const limit = parseInt(body.pageSize as string) || 10;
+            const skip = (page - 1) * limit;
+            const search = body.search as string || '';
+
+            const query: any = {};
+            if (search) {
+                query.$or = [
+                    { name: { $regex: search, $options: 'i' } },
+                    { sku: { $regex: search, $options: 'i' } }
+                ];
+            }
+
+            const total = await Product.countDocuments(query);
+            const products = await Product.find(query)
+                .populate('category', 'id name')
+                .populate('brand', 'id name')
+                .populate('supplier', 'id name')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit);
+
+            const response = {
+                content: products,
+                pageNo: page,
+                pageSize: limit,
+                totalElements: total,
+                totalPages: Math.ceil(total / limit),
+                last: page * limit >= total,
+                first: page === 1,
+                hasNext: page * limit < total,
+                hasPrevious: page > 1
+            };
+
+            appRouter.sendResponse(res, 200, response);
+        } catch (e) {
+            appRouter.sendResponse(res, 500, { message: 'Server Error' });
+        }
+    });
+
+    /**
+     * @swagger
      * /api/v1/admin/products:
      *   get:
      *     summary: Fetch all products (Admin view)
