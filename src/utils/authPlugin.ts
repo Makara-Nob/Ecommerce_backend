@@ -25,6 +25,9 @@ export const protect = async (req: any, res: ServerResponse, appRouter?: Router)
             return decoded.id; // Returns the integer ID to the controller
         } catch (error) {
             console.error('Not authorized, token failed');
+            if (appRouter) {
+                appRouter.sendResponse(res, 401, { message: 'Not authorized, token failed' });
+            }
         }
     }
 
