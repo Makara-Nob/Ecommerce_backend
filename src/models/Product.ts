@@ -6,7 +6,7 @@ export interface ICategory extends Document<number> {
     name: string;
     description?: string;
     code?: string;
-    icon?: string;
+    imageUrl?: string;
 }
 
 const categorySchema = new Schema<ICategory>({
@@ -14,7 +14,7 @@ const categorySchema = new Schema<ICategory>({
     name: { type: String, required: true },
     description: String,
     code: { type: String, unique: true },
-    icon: { type: String }
+    imageUrl: { type: String }
 }, { timestamps: true });
 categorySchema.plugin(autoIncrementPlugin, { modelName: 'Category', field: '_id' });
 
@@ -44,6 +44,7 @@ export interface IBrand extends Document<number> {
     name: string;
     description?: string;
     logoUrl?: string;
+    imageUrl?: string;
     status: string;
 }
 
@@ -51,7 +52,8 @@ const brandSchema = new Schema<IBrand>({
     _id: Number,
     name: { type: String, required: true },
     description: String,
-    logoUrl: String,
+    logoUrl: { type: String },
+    imageUrl: { type: String },
     status: { type: String, default: 'ACTIVE' }
 }, { timestamps: true });
 brandSchema.plugin(autoIncrementPlugin, { modelName: 'Brand', field: '_id' });

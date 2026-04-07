@@ -35,7 +35,7 @@ export default function(appRouter: Router) {
         try {
             if (!await admin(req, res, appRouter)) return;
 
-            const { name, description, code } = await appRouter.parseJsonBody(req);
+            const { name, description, code, imageUrl } = await appRouter.parseJsonBody(req);
             
             if (!name) {
                 return appRouter.sendResponse(res, 400, { message: 'Category name is required' });
@@ -46,7 +46,7 @@ export default function(appRouter: Router) {
                 return appRouter.sendResponse(res, 400, { message: 'Category already exists' });
             }
 
-            const category = await Category.create({ name, description, code });
+            const category = await Category.create({ name, description, code, imageUrl });
             appRouter.sendResponse(res, 201, category);
         } catch (e) {
             appRouter.sendResponse(res, 500, { message: 'Server Error' });
@@ -88,13 +88,14 @@ export default function(appRouter: Router) {
         try {
             if (!await admin(req, res, appRouter)) return;
 
-            const { name, description, code } = await appRouter.parseJsonBody(req);
+            const { name, description, code, imageUrl } = await appRouter.parseJsonBody(req);
             const category = await Category.findById(req.params.id);
 
             if (category) {
                 category.name = name || category.name;
                 category.description = description !== undefined ? description : category.description;
                 category.code = code || category.code;
+                category.imageUrl = imageUrl !== undefined ? imageUrl : category.imageUrl;
 
                 const updatedCategory = await category.save();
                 appRouter.sendResponse(res, 200, updatedCategory);

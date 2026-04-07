@@ -10,7 +10,15 @@ if (!fs.existsSync(uploadDir)) {
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, uploadDir);
+        // Read "folder" from query params, e.g., ?folder=categories
+        const query = (req as any).query;
+        const targetFolder = query?.folder || "";
+        const finalDir = path.join(uploadDir, targetFolder);
+
+        if (!fs.existsSync(finalDir)) {
+            fs.mkdirSync(finalDir, { recursive: true });
+        }
+        cb(null, finalDir);
     },
     filename: function (req, file, cb) {
         // Generate unique filename: prefix-timestamp.extension

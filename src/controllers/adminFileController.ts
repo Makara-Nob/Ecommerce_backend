@@ -69,7 +69,11 @@ export default function(appRouter: Router) {
       }
 
       // Return the relative URL starting with /uploads/
-      const fileUrl = `/uploads/${fileReq.file.filename}`;
+      const targetFolder = (req as any).query?.folder || "";
+      const fileUrl = targetFolder 
+        ? `/uploads/${targetFolder}/${fileReq.file.filename}`
+        : `/uploads/${fileReq.file.filename}`;
+
       appRouter.sendResponse(res, 200, { 
           message: 'File uploaded successfully',
           url: fileUrl 
