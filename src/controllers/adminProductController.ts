@@ -311,7 +311,14 @@ export default function(appRouter: Router) {
             const product = await Product.findById(req.params.id);
 
             if (product) {
-                Object.assign(product, body);
+                // Remove object fields that shouldn't be directly assigned to schema Number fields
+                const { category, brand, supplier, ...updateData } = body;
+                Object.assign(product, updateData);
+                
+                // Map ID fields correctly
+                if (body.categoryId !== undefined) product.category = body.categoryId;
+                if (body.brandId !== undefined) product.brand = body.brandId;
+                if (body.supplierId !== undefined) product.supplier = body.supplierId;
                 
                 // Keep SKU protected from updates unless explicitly specified and verified
                 if(body.sku && body.sku !== product.sku) {
