@@ -66,6 +66,8 @@ export interface IProductVariant extends Document<number> {
     stockQuantity: number;
     additionalPrice: number;
     imageUrl?: string;
+    discountType?: 'PERCENTAGE' | 'FIXED';
+    discountValue?: number;
     status: string;
 }
 
@@ -77,6 +79,8 @@ const productVariantSchema = new Schema<IProductVariant>({
     stockQuantity: { type: Number, default: 0 },
     additionalPrice: { type: Number, default: 0 },
     imageUrl: String,
+    discountType: { type: String, enum: ['PERCENTAGE', 'FIXED'], default: 'PERCENTAGE' },
+    discountValue: { type: Number, default: 0 },
     status: { type: String, default: 'ACTIVE' }
 }, { timestamps: true });
 productVariantSchema.plugin(autoIncrementPlugin, { modelName: 'ProductVariant', field: '_id' });
