@@ -324,10 +324,10 @@ export default function(appRouter: Router) {
 
   /**
    * @swagger
-   * /api/v1/auth/me:
+   * /api/v1/user/profile:
    *   get:
    *     summary: Get user profile
-   *     tags: [Auth]
+   *     tags: [User]
    *     security:
    *       - bearerAuth: []
    *     description: Get current logged in user profile
@@ -340,9 +340,9 @@ export default function(appRouter: Router) {
    *         description: User not found
    */
   // @desc    Get user profile
-  // @route   GET /api/v1/auth/me
+  // @route   GET /api/v1/user/profile
   // @access  Private
-  appRouter.get("/api/v1/auth/me", async (req: IncomingMessage, res: ServerResponse) => {
+  appRouter.get("/api/v1/user/profile", async (req: IncomingMessage, res: ServerResponse) => {
     try {
       const userId = await protect(req, res, appRouter);
       if (!userId) {
@@ -350,19 +350,36 @@ export default function(appRouter: Router) {
       }
 
       const user = await User.findById(userId);
-
       if (user) {
+        // Split fullName into firstName and lastName for the frontend
+        const nameParts = (user.fullName || "").split(" ");
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+
         appRouter.sendResponse(res, 200, {
-          id: user._id,
+          id: user._id.toString(),
+          userIdentifier: user.username,
           username: user.username,
           email: user.email,
+          firstName: firstName,
+          lastName: lastName,
           fullName: user.fullName,
           role: user.roles && user.roles.length > 0 ? user.roles[0] : 'CUSTOMER',
+          userType: user.roles && user.roles.length > 0 ? user.roles[0] : 'CUSTOMER',
           active: user.status === 'ACTIVE',
+          accountStatus: user.status,
           position: user.position,
           status: user.status,
           userPermission: user.userPermission,
           roles: user.roles,
+          phone: user.phone,
+          phoneNumber: user.phone,
+          profileUrl: user.profileUrl,
+          profileImageUrl: user.profileUrl,
+          address: user.address,
+          notes: user.notes,
+          telegramNotificationsEnabled: user.telegramNotificationsEnabled,
+          hasTelegramLinked: user.hasTelegramLinked,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
         });
@@ -376,10 +393,10 @@ export default function(appRouter: Router) {
 
   /**
    * @swagger
-   * /api/v1/auth/token/update-profile:
+   * /api/v1/user/profile:
    *   post:
    *     summary: Update profile
-   *     tags: [Auth]
+   *     tags: [User]
    *     security:
    *       - bearerAuth: []
    *     description: Update current logged in user profile
@@ -390,9 +407,9 @@ export default function(appRouter: Router) {
    *         description: Not authorized API token
    */
   // @desc    Update user profile
-  // @route   POST /api/v1/auth/token/update-profile
+  // @route   POST /api/v1/user/profile
   // @access  Private
-  appRouter.post("/api/v1/auth/token/update-profile", async (req: IncomingMessage, res: ServerResponse) => {
+  appRouter.post("/api/v1/user/profile", async (req: IncomingMessage, res: ServerResponse) => {
     try {
       const userId = await protect(req, res, appRouter);
       if (!userId) {
@@ -405,26 +422,61 @@ export default function(appRouter: Router) {
       }
 
       const body = await appRouter.parseJsonBody(req);
+      
+      // Map frontend fields to backend fields
+      if (body.firstName || body.lastName) {
+        const currentFullName = user.fullName || "";
+        const nameParts = currentFullName.split(" ");
+        const firstName = body.firstName !== undefined ? body.firstName : (nameParts[0] || "");
+        const lastName = body.lastName !== undefined ? body.lastName : (nameParts.slice(1).join(" ") || "");
+        user.fullName = `${firstName} ${lastName}`.trim();
+      }
+      
       if (body.fullName) user.fullName = body.fullName;
       if (body.email) user.email = body.email;
       if (body.phone) user.phone = body.phone;
+      if (body.phoneNumber) user.phone = body.phoneNumber;
       if (body.profileUrl) user.profileUrl = body.profileUrl;
+      if (body.profileImageUrl) user.profileUrl = body.profileImageUrl;
+      if (body.address) user.address = body.address;
+      if (body.notes) user.notes = body.notes;
+      if (body.telegramNotificationsEnabled !== undefined) user.telegramNotificationsEnabled = body.telegramNotificationsEnabled;
+      if (body.hasTelegramLinked !== undefined) user.hasTelegramLinked = body.hasTelegramLinked;
+      if (body.position) user.position = body.position;
+      if (body.status) user.status = body.status;
+      if (body.accountStatus) user.status = body.accountStatus;
 
       await user.save();
 
+      // Split fullName into firstName and lastName for the frontend
+      const nameParts = (user.fullName || "").split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
       appRouter.sendResponse(res, 200, {
-        id: user._id,
+        id: user._id.toString(),
+        userIdentifier: user.username,
         username: user.username,
         email: user.email,
+        firstName: firstName,
+        lastName: lastName,
         phone: user.phone,
+        phoneNumber: user.phone,
         fullName: user.fullName,
         role: user.roles && user.roles.length > 0 ? user.roles[0] : 'CUSTOMER',
+        userType: user.roles && user.roles.length > 0 ? user.roles[0] : 'CUSTOMER',
         active: user.status === 'ACTIVE',
+        accountStatus: user.status,
         position: user.position,
         status: user.status,
         userPermission: user.userPermission,
         roles: user.roles,
         profileUrl: user.profileUrl,
+        profileImageUrl: user.profileUrl,
+        address: user.address,
+        notes: user.notes,
+        telegramNotificationsEnabled: user.telegramNotificationsEnabled,
+        hasTelegramLinked: user.hasTelegramLinked,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       });
@@ -465,6 +517,40 @@ export default function(appRouter: Router) {
       }
     } catch (e) {
       appRouter.sendResponse(res, 500, { message: "Server Error" });
+    }
+  });
+
+  /**
+   * @swagger
+   * /api/v1/auth/delete-account:
+   *   delete:
+   *     summary: Delete account
+   *     tags: [Auth]
+   *     security:
+   *       - bearerAuth: []
+   *     description: Delete the current logged in user account
+   *     responses:
+   *       200:
+   *         description: Account deleted
+   *       401:
+   *         description: Not authorized
+   */
+  appRouter.delete("/api/v1/auth/delete-account", async (req: IncomingMessage, res: ServerResponse) => {
+    try {
+      const userId = await protect(req, res, appRouter);
+      if (!userId) return;
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return appRouter.sendResponse(res, 404, { message: "User not found" });
+      }
+
+      await User.findByIdAndDelete(userId);
+
+      appRouter.sendResponse(res, 200, { message: "Account deleted successfully" });
+    } catch (e: any) {
+      console.error(e);
+      appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
     }
   });
 }

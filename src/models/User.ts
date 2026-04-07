@@ -29,6 +29,10 @@ export interface IUser extends Document<string>, IUserMethods {
     otpExpiresAt?: Date;
     savedCards: ISavedCard[];
     wishlist: number[];
+    address?: string;
+    notes?: string;
+    telegramNotificationsEnabled: boolean;
+    hasTelegramLinked: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -103,7 +107,23 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods>({
     wishlist: [{
         type: Number,
         ref: 'Product'
-    }]
+    }],
+    address: {
+        type: String,
+        default: null
+    },
+    notes: {
+        type: String,
+        default: null
+    },
+    telegramNotificationsEnabled: {
+        type: Boolean,
+        default: false
+    },
+    hasTelegramLinked: {
+        type: Boolean,
+        default: false
+    }
 }, {
     timestamps: true
 });
