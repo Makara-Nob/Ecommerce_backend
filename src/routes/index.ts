@@ -15,6 +15,7 @@ import adminProductController from '../controllers/adminProductController';
 import adminFileController from '../controllers/adminFileController';
 import userController from '../controllers/userController';
 import adminBannerController from '../controllers/adminBannerController';
+import adminPromotionController from '../controllers/adminPromotionController';
 import stockTransactionController from '../controllers/stockTransactionController';
 import reportController from '../controllers/reportController';
 
@@ -48,6 +49,7 @@ adminProductController(appRouter);
 adminFileController(appRouter);
 userController(appRouter);
 adminBannerController(appRouter);
+adminPromotionController(appRouter);
 stockTransactionController(appRouter);
 reportController(appRouter);
 

@@ -33,7 +33,7 @@ export default function (appRouter: Router) {
                 status: banner.status
             };
 
-            appRouter.sendResponse(res, 201, { message: "Banner created successfully", data: mapped });
+            appRouter.sendResponse(res, 201, mapped);
         } catch (e: any) {
             console.error(e);
             appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
@@ -74,7 +74,7 @@ export default function (appRouter: Router) {
                 status: updatedBanner.status
             };
 
-            appRouter.sendResponse(res, 200, { message: "Banner updated successfully", data: mapped });
+            appRouter.sendResponse(res, 200, mapped);
         } catch (e: any) {
             console.error(e);
             appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
@@ -96,7 +96,7 @@ export default function (appRouter: Router) {
 
             await Banner.findByIdAndDelete(req.params.id);
 
-            appRouter.sendResponse(res, 200, { message: "Banner deleted successfully", data: null });
+            appRouter.sendResponse(res, 200, { message: "Banner deleted successfully" });
         } catch (e: any) {
             console.error(e);
             appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
@@ -126,7 +126,7 @@ export default function (appRouter: Router) {
                 status: banner.status
             };
 
-            appRouter.sendResponse(res, 200, { message: "Banner retrieved successfully", data: mapped });
+            appRouter.sendResponse(res, 200, mapped);
         } catch (e: any) {
             console.error(e);
             appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
@@ -176,15 +176,12 @@ export default function (appRouter: Router) {
             }));
 
             appRouter.sendResponse(res, 200, {
-                message: "Banners retrieved successfully",
-                data: {
-                    content: mapped,
-                    pageNo,
-                    pageSize,
-                    totalElements,
-                    totalPages,
-                    last: pageNo >= totalPages
-                }
+                content: mapped,
+                pageNo,
+                pageSize,
+                totalElements,
+                totalPages,
+                last: pageNo >= totalPages
             });
         } catch (e: any) {
             console.error(e);
