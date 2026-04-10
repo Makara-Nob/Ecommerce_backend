@@ -4,7 +4,7 @@ import axios from "axios";
 // ================= CONFIG =================
 export const ABA_PAYWAY_API_URL =
   process.env.ABA_PAYWAY_API_URL ||
-  "https://checkout-sandbox.payway.com.kh/api/v1/purchase";
+  "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase";
 
 export const ABA_PAYWAY_COF_URL =
   "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/cof/initial";
