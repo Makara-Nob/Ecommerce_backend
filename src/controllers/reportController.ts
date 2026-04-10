@@ -1,5 +1,7 @@
 import { Product, Category } from "../models/Product";
 import StockTransaction from "../models/StockTransaction";
+import { Order } from "../models/Order";
+import User from "../models/User";
 import { protect, admin } from "../utils/authPlugin";
 import { Router } from "../utils/Router";
 import { IncomingMessage, ServerResponse } from "http";
@@ -162,6 +164,88 @@ export default function (appRouter: Router) {
             appRouter.sendResponse(res, 200, { message: "Low stock alerts retrieved successfully", data: alerts });
         } catch (e: any) {
             console.error(e);
+            appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
+        }
+    });
+
+    // @desc    Get comprehensive admin dashboard summary
+    // @route   GET /api/v1/reports/admin-dashboard-summary
+    // @access  Private/Admin
+    appRouter.get("/api/v1/reports/admin-dashboard-summary", async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+            if (!await protect(req, res, appRouter)) return;
+            if (!await admin(req, res, appRouter)) return;
+
+            // 1. Basic Counts
+            const totalProducts = await Product.countDocuments();
+            const totalCustomers = await User.countDocuments({ roles: 'CUSTOMER' });
+            
+            // 2. Order & Revenue Stats
+            const allOrders = await Order.find({ status: { $ne: 'CANCELLED' } });
+            const totalRevenue = allOrders.reduce((sum, order) => sum + (order.netAmount || 0), 0);
+            const totalOrdersCount = await Order.countDocuments();
+            const activeOrdersCount = await Order.countDocuments({ 
+                status: { $in: ['PENDING', 'CONFIRMED', 'SHIPPED'] } 
+            });
+
+            // 3. Sales Trend (Last 7 Days)
+            const salesTrend: any[] = [];
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateString = date.toISOString().split('T')[0];
+                
+                const startOfDay = new Date(date);
+                startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(date);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const dayOrders = await Order.find({
+                    createdAt: { $gte: startOfDay, $lte: endOfDay },
+                    status: { $ne: 'CANCELLED' }
+                });
+
+                const dayRevenue = dayOrders.reduce((sum, order) => sum + (order.netAmount || 0), 0);
+                
+                salesTrend.push({
+                    date: dateString,
+                    revenue: Number(dayRevenue.toFixed(2)),
+                    orderCount: dayOrders.length
+                });
+            }
+
+            // 4. Recent Orders (Last 5)
+            const recentOrders = await Order.find()
+                .populate('userId', 'fullName profileUrl')
+                .sort({ createdAt: -1 })
+                .limit(5);
+
+            const data = {
+                summary: {
+                    totalRevenue: Number(totalRevenue.toFixed(2)),
+                    totalOrders: totalOrdersCount,
+                    activeOrders: activeOrdersCount,
+                    totalCustomers,
+                    totalProducts
+                },
+                salesTrend,
+                recentOrders: recentOrders.map(order => ({
+                    id: order._id,
+                    invoiceNumber: order.invoiceNumber,
+                    customerName: (order.userId as any)?.fullName || 'Guest',
+                    customerProfile: (order.userId as any)?.profileUrl,
+                    amount: order.netAmount,
+                    status: order.status,
+                    createdAt: order.createdAt
+                }))
+            };
+
+            appRouter.sendResponse(res, 200, { 
+                message: "Dashboard summary retrieved successfully", 
+                data 
+            });
+        } catch (e: any) {
+            console.error('[Dashboard API Error]:', e);
             appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
         }
     });
