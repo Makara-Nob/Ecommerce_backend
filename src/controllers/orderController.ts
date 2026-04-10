@@ -183,7 +183,9 @@ export default function (appRouter: Router) {
         // ---------------------------------------
 
         // 4. Clear the cart if used
-        if (usedCart && cartToClear) {
+        // For ABA_PAYWAY, delay cart clearing until payment is confirmed.
+        // For CASH (and others), clear immediately since there's no online payment step.
+        if (usedCart && cartToClear && paymentMethod !== "ABA_PAYWAY") {
             cartToClear.status = "CHECKED_OUT";
             await cartToClear.save();
             await CartItem.deleteMany({ cartId: cartToClear.id });
@@ -663,6 +665,24 @@ export default function (appRouter: Router) {
         if (isSuccess) {
           order.status = "CONFIRMED";
           order.paywayStatus = "APPROVED";
+
+          // Deduct stock upon successful token payment
+          for (const item of order.items) {
+            const product = await Product.findById(item.product);
+            if (product) {
+              product.quantity -= item.quantity;
+              await product.save();
+            }
+          }
+
+          // Clear the user's active cart now that payment is confirmed
+          const paidCart = await Cart.findOne({ userId: order.userId, status: "ACTIVE" });
+          if (paidCart) {
+            paidCart.status = "CHECKED_OUT";
+            await paidCart.save();
+            await CartItem.deleteMany({ cartId: paidCart.id });
+          }
+
           await order.save();
           return appRouter.sendResponse(res, 200, { success: true, order });
         } else {
@@ -792,6 +812,14 @@ export default function (appRouter: Router) {
               product.quantity -= item.quantity;
               await product.save();
             }
+          }
+
+          // Clear the user's active cart now that payment is confirmed
+          const paidCart = await Cart.findOne({ userId: order.userId, status: "ACTIVE" });
+          if (paidCart) {
+            paidCart.status = "CHECKED_OUT";
+            await paidCart.save();
+            await CartItem.deleteMany({ cartId: paidCart.id });
           }
 
           await order.save();
@@ -1009,6 +1037,14 @@ export default function (appRouter: Router) {
                       }
                     }
 
+                    // Clear the user's active cart now that card-on-file payment is confirmed
+                    const paidCart = await Cart.findOne({ userId: order.userId, status: "ACTIVE" });
+                    if (paidCart) {
+                      paidCart.status = "CHECKED_OUT";
+                      await paidCart.save();
+                      await CartItem.deleteMany({ cartId: paidCart.id });
+                    }
+
                     await order.save();
                   } else {
                     order.status = "CANCELLED";
@@ -1042,6 +1078,14 @@ export default function (appRouter: Router) {
                     product.quantity -= item.quantity;
                     await product.save();
                   }
+                }
+
+                // Clear the user's active cart now that payment webhook is confirmed
+                const paidCart = await Cart.findOne({ userId: order.userId, status: "ACTIVE" });
+                if (paidCart) {
+                  paidCart.status = "CHECKED_OUT";
+                  await paidCart.save();
+                  await CartItem.deleteMany({ cartId: paidCart.id });
                 }
 
                 await order.save();
