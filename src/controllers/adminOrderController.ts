@@ -6,7 +6,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 import { admin } from '../utils/authPlugin';
 import { sendPushNotification } from '../utils/fcmService';
 
-export default function(appRouter: Router) {
+export default function (appRouter: Router) {
     /**
      * @swagger
      * /api/v1/admin/orders/fetch:
@@ -46,7 +46,7 @@ export default function(appRouter: Router) {
             const status = body.status as string || '';
 
             const query: any = {};
-            
+
             if (status && status !== 'ALL') {
                 query.status = status;
             }
@@ -74,10 +74,12 @@ export default function(appRouter: Router) {
             const response = {
                 content: orders.map(o => {
                     const obj = o.toObject();
+                    const userObj = obj.userId;
                     return {
                         ...obj,
                         id: obj._id,
-                        user: obj.userId // Mapping userId populate to 'user' for cleaner frontend access
+                        userId: (userObj && typeof userObj === 'object') ? (userObj as any)._id : obj.userId,
+                        user: userObj
                     };
                 }),
                 pageNo: page,
