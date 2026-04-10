@@ -48,7 +48,11 @@ export default function (appRouter: Router) {
             const query: any = {};
 
             if (status && status !== 'ALL') {
-                query.status = status;
+                if (status === 'PENDING_ACTION') {
+                    query.status = { $nin: ['DELIVERED', 'CANCELLED'] };
+                } else {
+                    query.status = status;
+                }
             }
 
             if (search) {
