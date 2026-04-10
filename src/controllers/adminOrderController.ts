@@ -178,7 +178,20 @@ export default function (appRouter: Router) {
                 }
             }
 
-            appRouter.sendResponse(res, 200, { success: true, status: order.status });
+            const updatedOrder = await Order.findById(order._id).populate('userId', 'fullName email phone');
+            if (!updatedOrder) return appRouter.sendResponse(res, 404, { message: 'Order update verification failed' });
+
+            const obj = updatedOrder.toObject();
+            const userObj = obj.userId;
+            
+            const responseData = {
+                ...obj,
+                id: obj._id,
+                userId: (userObj && typeof userObj === 'object') ? (userObj as any)._id : obj.userId,
+                user: userObj
+            };
+
+            appRouter.sendResponse(res, 200, responseData);
         } catch (e: any) {
             appRouter.sendResponse(res, 500, { message: e.message || 'Server Error' });
         }
