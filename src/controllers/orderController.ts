@@ -771,6 +771,33 @@ export default function (appRouter: Router) {
     }
   );
 
+  // @desc    Cancel a PENDING order (user's own orders only)
+  // @route   POST /api/v1/orders/:id/cancel
+  // @access  Private
+  appRouter.post(
+    "/api/v1/orders/:id/cancel",
+    async (req: IncomingMessage & { params?: any }, res: ServerResponse) => {
+      try {
+        const userId = await protect(req, res, appRouter);
+        if (!userId) return;
+
+        const order = await Order.findById(req.params.id);
+        if (!order) return appRouter.sendResponse(res, 404, { message: "Order not found" });
+        if (order.userId !== userId) return appRouter.sendResponse(res, 403, { message: "Forbidden" });
+        if (order.status !== "PENDING") {
+          return appRouter.sendResponse(res, 400, { message: `Cannot cancel an order in ${order.status} status` });
+        }
+
+        order.status = "CANCELLED";
+        await order.save();
+
+        appRouter.sendResponse(res, 200, { success: true, order });
+      } catch (e: any) {
+        appRouter.sendResponse(res, 500, { message: e.message || "Server Error" });
+      }
+    }
+  );
+
   // @desc    Check payment status manually
   // @route   POST /api/v1/orders/:id/check-payment
   // @access  Private
