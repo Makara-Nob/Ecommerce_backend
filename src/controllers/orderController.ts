@@ -307,7 +307,9 @@ export default function (appRouter: Router) {
 
         // Support status filtering
         const filter: any = { userId };
-        if (body.status === 'PAID') {
+        if (body.status === 'IN_PROGRESS') {
+          filter.status = { $in: ['CONFIRMED', 'SHIPPED'] };
+        } else if (body.status === 'PAID') {
           filter.status = { $in: ['CONFIRMED', 'SHIPPED', 'DELIVERED'] };
         } else if (body.status && body.status !== 'ALL') {
           filter.status = body.status;
