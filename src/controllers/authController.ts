@@ -53,6 +53,34 @@ export default function (appRouter: Router) {
       const user = await User.findOne({ username });
 
       if (user && (await user.matchPassword(password))) {
+        if (user.status !== 'ACTIVE') {
+          // Generate new OTP and resend
+          const otp = Math.floor(100000 + Math.random() * 900000).toString();
+          const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+          
+          user.otp = otp;
+          user.otpExpiresAt = otpExpiresAt;
+          await user.save();
+
+          // Send email
+          try {
+            await sendEmail({
+              email: user.email,
+              subject: 'Verify your NAGA Shop Account',
+              message: `Your OTP is: ${otp}. It will expire in 10 minutes.`,
+              html: getOtpEmailTemplate(otp)
+            });
+          } catch (error) {
+            console.error('Email could not be sent', error);
+          }
+
+          return appRouter.sendResponse(res, 401, {
+            message: "Account not verified. A new OTP has been sent to your email.",
+            isVerified: false,
+            email: user.email
+          });
+        }
+
         appRouter.sendResponse(res, 200, {
           token: generateToken(user._id, user.roles),
           user: {
