@@ -62,16 +62,16 @@ export default function (appRouter: Router) {
           user.otpExpiresAt = otpExpiresAt;
           await user.save();
 
-          // Send email
+          // Send email asynchronously
           try {
-            await sendEmail({
+            sendEmail({
               email: user.email,
               subject: 'Verify your NAGA Shop Account',
               message: `Your OTP is: ${otp}. It will expire in 10 minutes.`,
               html: getOtpEmailTemplate(otp)
-            });
+            }).catch(err => console.error('Background email error:', err));
           } catch (error) {
-            console.error('Email could not be sent', error);
+            console.error('Email trigger failed', error);
           }
 
           return appRouter.sendResponse(res, 401, {
@@ -186,17 +186,16 @@ export default function (appRouter: Router) {
       });
 
       if (user) {
-        // Send email
+        // Send email asynchronously so it doesn't block the API response
         try {
-          await sendEmail({
+          sendEmail({
             email: user.email,
             subject: 'Verify your NAGA Shop Account',
             message: `Your OTP is: ${otp}. It will expire in 10 minutes.`,
             html: getOtpEmailTemplate(otp)
-          });
+          }).catch(err => console.error('Email failed to send (background):', err));
         } catch (error) {
-          console.error('Email could not be sent', error);
-          // We don't abort registration here, but they might need to resend OTP
+          console.error('Email trigger failed', error);
         }
 
         appRouter.sendResponse(res, 201, {
@@ -336,17 +335,17 @@ export default function (appRouter: Router) {
       user.otpExpiresAt = otpExpiresAt;
       await user.save();
 
-      // Send email
+      // Send email asynchronously
       try {
-        await sendEmail({
+        sendEmail({
           email: user.email,
           subject: 'Verify your NAGA Shop Account',
           message: `Your new OTP is: ${otp}. It will expire in 10 minutes.`,
           html: getOtpEmailTemplate(otp)
-        });
+        }).catch(err => console.error('Background email error:', err));
       } catch (error) {
-        console.error('Email could not be sent', error);
-        return appRouter.sendResponse(res, 500, { message: "Could not send email" });
+        console.error('Email trigger failed', error);
+        return appRouter.sendResponse(res, 500, { message: "Could not trigger email sending process" });
       }
 
       appRouter.sendResponse(res, 200, { message: "OTP resent successfully" });
