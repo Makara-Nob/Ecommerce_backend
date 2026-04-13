@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:developer.payway.com.kh)",
-      "Bash(ipconfig)"
+      "Bash(ipconfig)",
+      "Bash(npm run:*)",
+      "Bash(flutter pub:*)",
+      "Bash(dart run:*)"
     ]
   }
 }
