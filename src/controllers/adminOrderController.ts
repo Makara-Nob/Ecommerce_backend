@@ -4,6 +4,7 @@ import { Router } from '../utils/Router';
 import { IncomingMessage, ServerResponse } from 'http';
 import { admin } from '../utils/authPlugin';
 import { sendPushNotification } from '../utils/fcmService';
+import { sendEmail } from '../utils/sendEmail';
 
 export default function (appRouter: Router) {
     /**
@@ -170,6 +171,30 @@ export default function (appRouter: Router) {
                         body,
                         { orderId: order.id.toString(), type }
                     );
+
+                    if (status === 'DELIVERED') {
+                        const user = await User.findById(order.userId).select('email firstName lastName');
+                        if (user?.email) {
+                            await sendEmail({
+                                email: user.email,
+                                subject: `Order #${order.id} Delivered!`,
+                                message: body,
+                                html: `
+                                    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:12px;">
+                                        <h2 style="color:#2B60E6;margin-bottom:8px;">Your Order Has Been Delivered! 📦</h2>
+                                        <p style="color:#374151;">Hi ${user.firstName ?? 'there'},</p>
+                                        <p style="color:#374151;">Great news! Your order <strong>#${order.id}</strong> has been delivered successfully.</p>
+                                        <p style="color:#374151;">We hope you enjoy your purchase. If you have any questions or concerns, feel free to contact us.</p>
+                                        <div style="margin:24px 0;padding:16px;background:#EEF2FF;border-radius:8px;text-align:center;">
+                                            <span style="font-size:48px;">🎉</span>
+                                            <p style="color:#2B60E6;font-weight:bold;margin:8px 0;">Order #${order.id} — Delivered</p>
+                                        </div>
+                                        <p style="color:#6B7280;font-size:13px;">Thank you for shopping with NAGA Shop!</p>
+                                    </div>
+                                `,
+                            }).catch(err => console.error('Delivery email failed:', err));
+                        }
+                    }
                 }
             }
 
