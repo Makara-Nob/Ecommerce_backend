@@ -192,14 +192,6 @@ export default function (appRouter: Router) {
           ...(paywayTranId && { paywayTranId }),
         });
 
-        // --- PUSH NOTIFICATION: ORDER PLACED ---
-        await sendPushNotification(
-          userId,
-          "Order Placed!",
-          `Your order #${order.id} has been placed successfully.`
-        );
-        // ---------------------------------------
-
         // --- TELEGRAM NOTIFICATION: NEW ORDER ---
         try {
           const user = await User.findById(userId);
@@ -218,7 +210,17 @@ export default function (appRouter: Router) {
         }
         // ---------------------------------------
 
-        // 4. Clear the cart if used
+        // 4. For non-ABA orders (e.g. CASH), notify immediately — payment is implicit
+        if (paymentMethod !== "ABA_PAYWAY") {
+          await sendPushNotification(
+            userId,
+            "Order Placed!",
+            `Your order #${order.id} has been placed successfully.`
+          );
+        }
+        // ABA_PAYWAY orders notify only after payment is confirmed (see check-payment endpoint)
+
+        // 5. Clear the cart if used
         // For ABA_PAYWAY, delay cart clearing until payment is confirmed.
         // For CASH (and others), clear immediately since there's no online payment step.
         if (usedCart && cartToClear && paymentMethod !== "ABA_PAYWAY") {
