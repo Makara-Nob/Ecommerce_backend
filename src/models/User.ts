@@ -32,6 +32,7 @@ export interface IUser extends Document<string>, IUserMethods {
     wishlist: number[];
     address?: string;
     notes?: string;
+    dob?: string;
     telegramNotificationsEnabled: boolean;
     hasTelegramLinked: boolean;
     createdAt: Date;
@@ -118,6 +119,10 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods>({
         default: null
     },
     notes: {
+        type: String,
+        default: null
+    },
+    dob: {
         type: String,
         default: null
     },

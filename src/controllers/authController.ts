@@ -430,6 +430,7 @@ export default function (appRouter: Router) {
           profileImageUrl: user.profileUrl,
           address: user.address,
           notes: user.notes,
+          dob: user.dob,
           telegramNotificationsEnabled: user.telegramNotificationsEnabled,
           hasTelegramLinked: user.hasTelegramLinked,
           createdAt: user.createdAt,
@@ -482,6 +483,7 @@ export default function (appRouter: Router) {
       if (body.phoneNumber) user.phone = body.phoneNumber;
       if (body.profileUrl) user.profileUrl = body.profileUrl;
       if (body.profileImageUrl) user.profileUrl = body.profileImageUrl;
+      if (body.dob) user.dob = body.dob;
       if (body.address) user.address = body.address;
       if (body.notes) user.notes = body.notes;
       if (body.telegramNotificationsEnabled !== undefined) user.telegramNotificationsEnabled = body.telegramNotificationsEnabled;
@@ -513,6 +515,7 @@ export default function (appRouter: Router) {
         profileImageUrl: user.profileUrl,
         address: user.address,
         notes: user.notes,
+        dob: user.dob,
         telegramNotificationsEnabled: user.telegramNotificationsEnabled,
         hasTelegramLinked: user.hasTelegramLinked,
         createdAt: user.createdAt,
